@@ -1,0 +1,53 @@
+﻿@page "/basket"
+@attribute [Authorize]
+@using Basket.Models
+@using WebApp.ApiClients
+@inject BasketApiClient BasketApiClient
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+<PageTitle>My Basket</PageTitle>
+
+<h1>My Basket</h1>
+
+@if (cart is null || cart.Items.Count == 0)
+{
+    <p><em>Your basket is empty.</em></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Product</th>
+                <th>Color</th>
+                <th>Quantity</th>
+                <th>Price</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in cart.Items)
+            {
+                <tr>
+                    <td>@item.ProductName</td>
+                    <td>@item.Color</td>
+                    <td>@item.Quantity</td>
+                    <td>@item.Price.ToString("C2")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <p><strong>Total: @cart.TotalPrice.ToString("C2")</strong></p>
+}
+
+@code {
+    private ShoppingCart? cart;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var userName = HttpContextAccessor.HttpContext?.User.Identity?.Name;
+        if (!string.IsNullOrEmpty(userName))
+        {
+            cart = await BasketApiClient.GetBasket(userName);
+        }
+    }
+}

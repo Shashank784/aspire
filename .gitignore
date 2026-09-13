@@ -1,0 +1,6 @@
+# Claude Code local session settings
+.claude/settings.local.json
+
+# .NET build artifacts (also covered per-project, kept here as a safety net)
+[Bb]in/
+[Oo]bj/

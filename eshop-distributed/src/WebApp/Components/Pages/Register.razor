@@ -1,0 +1,91 @@
+﻿@page "/register"
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Authentication.Cookies
+@using WebApp.ApiClients
+@using WebApp.Authentication
+@inject IdentityApiClient IdentityApiClient
+@inject NavigationManager NavigationManager
+
+<PageTitle>Register</PageTitle>
+
+<h1>Create an account</h1>
+
+<div class="row">
+    <div class="col-md-4">
+        <EditForm Model="Input" method="post" OnValidSubmit="RegisterAsync" FormName="register">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" role="alert" />
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger">@errorMessage</div>
+            }
+
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="Input.FullName" class="form-control" placeholder="Jane Doe" />
+                <label>Full name</label>
+            </div>
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="Input.Email" class="form-control" placeholder="name@example.com" />
+                <label>Email</label>
+            </div>
+            <div class="form-floating mb-3">
+                <InputText type="password" @bind-Value="Input.Password" class="form-control" placeholder="password" />
+                <label>Password</label>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">Register</button>
+        </EditForm>
+
+        <p class="mt-3">
+            Already have an account? <a href="/login">Log in here</a>
+        </p>
+    </div>
+</div>
+
+@code {
+    private string? errorMessage;
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromForm]
+    private RegisterModel Input { get; set; } = new();
+
+    private async Task RegisterAsync()
+    {
+        var result = await IdentityApiClient.RegisterAsync(Input.Email, Input.Password, Input.FullName);
+
+        if (!result.Succeeded || result.Response is null)
+        {
+            errorMessage = result.Error ?? "Registration failed.";
+            return;
+        }
+
+        // New accounts always land in the "User" role — becoming an Admin happens out of band.
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.Name, Input.Email),
+            new(ClaimTypes.Email, Input.Email),
+            new(AuthClaimTypes.AccessToken, result.Response.AccessToken),
+            new(AuthClaimTypes.RefreshToken, result.Response.RefreshToken)
+        };
+        claims.AddRange(result.Response.Roles.Select(role => new Claim(ClaimTypes.Role, role)));
+
+        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
+
+        NavigationManager.NavigateTo("/", forceLoad: true);
+    }
+
+    private sealed class RegisterModel
+    {
+        public string? FullName { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Required, System.ComponentModel.DataAnnotations.EmailAddress]
+        public string Email { get; set; } = "";
+
+        [System.ComponentModel.DataAnnotations.Required, System.ComponentModel.DataAnnotations.MinLength(6)]
+        public string Password { get; set; } = "";
+    }
+}

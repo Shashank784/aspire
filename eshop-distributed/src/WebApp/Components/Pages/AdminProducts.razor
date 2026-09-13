@@ -1,0 +1,59 @@
+﻿@page "/admin/products"
+@attribute [Authorize(Roles = "Admin")]
+@using Catalog.Models
+@using WebApp.ApiClients
+@inject CatalogApiClient CatalogApiClient
+
+<PageTitle>Admin - Products</PageTitle>
+
+<h1>Admin: Add Product</h1>
+
+<EditForm Model="newProduct" OnValidSubmit="CreateAsync" FormName="admin-add-product" method="post">
+    <DataAnnotationsValidator />
+    <ValidationSummary class="text-danger" role="alert" />
+
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="alert alert-info">@statusMessage</div>
+    }
+
+    <div class="mb-3">
+        <label>Name</label>
+        <InputText @bind-Value="newProduct.Name" class="form-control" />
+    </div>
+    <div class="mb-3">
+        <label>Description</label>
+        <InputText @bind-Value="newProduct.Description" class="form-control" />
+    </div>
+    <div class="mb-3">
+        <label>Price</label>
+        <InputNumber @bind-Value="newProduct.Price" class="form-control" />
+    </div>
+    <div class="mb-3">
+        <label>Image URL</label>
+        <InputText @bind-Value="newProduct.ImageUrl" class="form-control" placeholder="https://example.com/my-product.png" />
+        <div class="form-text">Paste a full image URL (https://...). Bare filenames are only resolved for the original seeded products.</div>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Create product</button>
+</EditForm>
+
+@code {
+    [SupplyParameterFromForm]
+    private Product newProduct { get; set; } = new();
+
+    private string? statusMessage;
+
+    private async Task CreateAsync()
+    {
+        var created = await CatalogApiClient.CreateProduct(newProduct);
+        statusMessage = created is not null
+            ? $"Created product '{created.Name}' (Id {created.Id})."
+            : "Failed to create product.";
+
+        if (created is not null)
+        {
+            newProduct = new Product();
+        }
+    }
+}

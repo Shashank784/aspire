@@ -1,0 +1,80 @@
+@page "/products"
+@rendermode InteractiveServer
+@inject CatalogApiClient CatalogApiClient
+@inject BasketActions BasketActions
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+@attribute [StreamRendering(true)]
+
+<PageTitle>Products</PageTitle>
+
+<h1>Products</h1>
+
+<p>Here are some of our amazing outdoor products that you can purchase.</p>
+
+@if (products == null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (products.Count == 0)
+{
+    <p><em>There is a problem loading our products. Please try again later.</em></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Image</th>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Price</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var product in products)
+            {
+                <tr>
+                    <td><img height="80" width="80" src="@ProductImageResolver.Resolve(product)" /></td>
+                    <td>@product.Name</td>
+                    <td>@product.Description</td>
+                    <td>@product.Price.ToString("C2")</td>
+                    <td>
+                        <button class="btn btn-primary btn-sm" @onclick="() => AddToBasket(product)">Add to Basket</button>
+                        @if (statusMessages.TryGetValue(product.Id, out var message))
+                        {
+                            <div class="small text-success">@message</div>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Product>? products;
+    private readonly Dictionary<int, string> statusMessages = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Simulate asynchronous loading to demonstrate streaming rendering
+        products = await CatalogApiClient.GetProducts();
+    }
+
+    private async Task AddToBasket(Product product)
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userName = authState.User.Identity?.IsAuthenticated == true ? authState.User.Identity.Name : null;
+
+        if (string.IsNullOrEmpty(userName))
+        {
+            NavigationManager.NavigateTo("/login?ReturnUrl=/products", forceLoad: true);
+            return;
+        }
+
+        await BasketActions.AddToBasketAsync(userName, product);
+        statusMessages[product.Id] = "Added to basket!";
+    }
+}
