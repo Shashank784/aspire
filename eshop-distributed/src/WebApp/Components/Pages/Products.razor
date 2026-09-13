@@ -1,5 +1,6 @@
 @page "/products"
 @rendermode InteractiveServer
+@using WebApp.Authentication
 @inject CatalogApiClient CatalogApiClient
 @inject BasketActions BasketActions
 @inject AuthenticationStateProvider AuthenticationStateProvider
@@ -74,7 +75,12 @@ else
             return;
         }
 
-        await BasketActions.AddToBasketAsync(userName, product);
-        statusMessages[product.Id] = "Added to basket!";
+        // IHttpContextAccessor isn't reliably available during interactive Blazor Server event
+        // handlers, so the JWT is read from the (circuit-safe) authentication state and passed
+        // through explicitly rather than relying on the ambient HttpContext.
+        var accessToken = authState.User.FindFirst(AuthClaimTypes.AccessToken)?.Value;
+
+        var succeeded = await BasketActions.AddToBasketAsync(userName, accessToken, product);
+        statusMessages[product.Id] = succeeded ? "Added to basket!" : "Failed to add to basket.";
     }
 }

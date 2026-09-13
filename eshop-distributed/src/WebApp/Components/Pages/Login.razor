@@ -23,11 +23,11 @@
             }
 
             <div class="form-floating mb-3">
-                <InputText @bind-Value="Input.Email" class="form-control" placeholder="name@example.com" />
+                <InputText @bind-Value="Input!.Email" class="form-control" placeholder="name@example.com" />
                 <label>Email</label>
             </div>
             <div class="form-floating mb-3">
-                <InputText type="password" @bind-Value="Input.Password" class="form-control" placeholder="password" />
+                <InputText type="password" @bind-Value="Input!.Password" class="form-control" placeholder="password" />
                 <label>Password</label>
             </div>
             <button type="submit" class="btn btn-primary w-100">Log in</button>
@@ -46,20 +46,16 @@
     private HttpContext HttpContext { get; set; } = default!;
 
     [SupplyParameterFromForm]
-    private LoginModel? InputModel { get; set; }
-
-    // Non-null accessor for the markup bindings; OnInitialized guarantees InputModel is set
-    // before the form can be submitted or its fields bound.
-    private LoginModel Input => InputModel!;
+    private LoginModel? Input { get; set; }
 
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
 
-    protected override void OnInitialized() => InputModel ??= new();
+    protected override void OnInitialized() => Input ??= new();
 
     private async Task LoginAsync()
     {
-        var result = await IdentityApiClient.LoginAsync(Input.Email, Input.Password);
+        var result = await IdentityApiClient.LoginAsync(Input!.Email, Input.Password);
 
         if (!result.Succeeded || result.Response is null)
         {

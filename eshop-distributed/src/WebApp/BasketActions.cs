@@ -7,9 +7,9 @@ namespace WebApp;
 // Shared "add to basket" logic used by both the Products and Search pages.
 public class BasketActions(BasketApiClient basketApiClient)
 {
-    public async Task AddToBasketAsync(string userName, Product product)
+    public async Task<bool> AddToBasketAsync(string userName, string? accessToken, Product product)
     {
-        var cart = await basketApiClient.GetBasket(userName) ?? new ShoppingCart { UserName = userName };
+        var cart = await basketApiClient.GetBasket(userName, accessToken) ?? new ShoppingCart { UserName = userName };
 
         var existingItem = cart.Items.FirstOrDefault(i => i.ProductId == product.Id);
         if (existingItem is not null)
@@ -28,6 +28,6 @@ public class BasketActions(BasketApiClient basketApiClient)
             });
         }
 
-        await basketApiClient.UpdateBasket(cart);
+        return await basketApiClient.UpdateBasket(cart, accessToken);
     }
 }

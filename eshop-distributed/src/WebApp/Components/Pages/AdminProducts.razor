@@ -19,19 +19,19 @@
 
     <div class="mb-3">
         <label>Name</label>
-        <InputText @bind-Value="newProduct.Name" class="form-control" />
+        <InputText @bind-Value="newProduct!.Name" class="form-control" />
     </div>
     <div class="mb-3">
         <label>Description</label>
-        <InputText @bind-Value="newProduct.Description" class="form-control" />
+        <InputText @bind-Value="newProduct!.Description" class="form-control" />
     </div>
     <div class="mb-3">
         <label>Price</label>
-        <InputNumber @bind-Value="newProduct.Price" class="form-control" />
+        <InputNumber @bind-Value="newProduct!.Price" class="form-control" />
     </div>
     <div class="mb-3">
         <label>Image URL</label>
-        <InputText @bind-Value="newProduct.ImageUrl" class="form-control" placeholder="https://example.com/my-product.png" />
+        <InputText @bind-Value="newProduct!.ImageUrl" class="form-control" placeholder="https://example.com/my-product.png" />
         <div class="form-text">Paste a full image URL (https://...). Bare filenames are only resolved for the original seeded products.</div>
     </div>
 
@@ -40,26 +40,22 @@
 
 @code {
     [SupplyParameterFromForm]
-    private Product? Input { get; set; }
-
-    // Non-null accessor for the markup bindings; OnInitialized guarantees Input is set
-    // before the form can be submitted or its fields bound.
-    private Product newProduct => Input!;
+    private Product? newProduct { get; set; }
 
     private string? statusMessage;
 
-    protected override void OnInitialized() => Input ??= new();
+    protected override void OnInitialized() => newProduct ??= new();
 
     private async Task CreateAsync()
     {
-        var created = await CatalogApiClient.CreateProduct(newProduct);
+        var created = await CatalogApiClient.CreateProduct(newProduct!);
         statusMessage = created is not null
             ? $"Created product '{created.Name}' (Id {created.Id})."
             : "Failed to create product.";
 
         if (created is not null)
         {
-            Input = new Product();
+            newProduct = new Product();
         }
     }
 }
