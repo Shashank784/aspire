@@ -40,9 +40,15 @@
 
 @code {
     [SupplyParameterFromForm]
-    private Product newProduct { get; set; } = new();
+    private Product? Input { get; set; }
+
+    // Non-null accessor for the markup bindings; OnInitialized guarantees Input is set
+    // before the form can be submitted or its fields bound.
+    private Product newProduct => Input!;
 
     private string? statusMessage;
+
+    protected override void OnInitialized() => Input ??= new();
 
     private async Task CreateAsync()
     {
@@ -53,7 +59,7 @@
 
         if (created is not null)
         {
-            newProduct = new Product();
+            Input = new Product();
         }
     }
 }

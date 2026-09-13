@@ -46,10 +46,16 @@
     private HttpContext HttpContext { get; set; } = default!;
 
     [SupplyParameterFromForm]
-    private LoginModel Input { get; set; } = new();
+    private LoginModel? InputModel { get; set; }
+
+    // Non-null accessor for the markup bindings; OnInitialized guarantees InputModel is set
+    // before the form can be submitted or its fields bound.
+    private LoginModel Input => InputModel!;
 
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
+
+    protected override void OnInitialized() => InputModel ??= new();
 
     private async Task LoginAsync()
     {
