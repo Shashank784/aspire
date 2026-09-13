@@ -19,7 +19,7 @@ Backing services: PostgreSQL, Redis, RabbitMQ (all provisioned automatically by 
 
 ## Prerequisites
 
-- [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (running) — AppHost provisions PostgreSQL, Redis, and RabbitMQ as containers
 
 ## Running the project
