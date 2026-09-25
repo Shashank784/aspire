@@ -72,4 +72,26 @@ var webapp = builder
     .WaitFor(identity)
     .WaitFor(orders);
 
+// React frontend: the Vite dev server proxies /api and /bff to the BFF, which holds the
+// login cookie and forwards API calls to the services with the user's JWT attached.
+var bff = builder
+    .AddProject<Projects.Bff>("bff")
+    .WithReference(identity)
+    .WithReference(catalog)
+    .WithReference(basket)
+    .WithReference(orders)
+    .WaitFor(identity)
+    .WaitFor(catalog)
+    .WaitFor(basket)
+    .WaitFor(orders);
+
+var frontend = builder
+    .AddViteApp("frontend", "../frontend")
+    .WithReference(bff)
+    .WaitFor(bff)
+    .WithExternalHttpEndpoints();
+
+// Stripe sends the customer back to the React app after payment.
+orders.WithEnvironment("Stripe__WebAppBaseUrl", frontend.GetEndpoint("http"));
+
 builder.Build().Run();

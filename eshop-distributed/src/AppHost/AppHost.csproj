@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.AppHost" Version="13.5.3" />
+    <PackageReference Include="Aspire.Hosting.JavaScript" Version="13.5.3" />
     <PackageReference Include="Aspire.Hosting.PostgreSQL" Version="13.5.3" />
     <PackageReference Include="Aspire.Hosting.RabbitMQ" Version="13.5.3" />
     <PackageReference Include="Aspire.Hosting.Redis" Version="13.5.3" />
@@ -24,6 +25,7 @@
     <ProjectReference Include="..\Identity\Identity.csproj" />
     <ProjectReference Include="..\Orders\Orders.csproj" />
     <ProjectReference Include="..\WebApp\WebApp.csproj" />
+    <ProjectReference Include="..\Bff\Bff.csproj" />
   </ItemGroup>
 
 </Project>
