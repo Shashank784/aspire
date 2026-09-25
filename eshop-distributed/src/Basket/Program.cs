@@ -13,6 +13,9 @@ builder.Services.AddHttpClient<CatalogApiClient>(client =>
 
 builder.Services.AddMassTransitWithAssemblies(Assembly.GetExecutingAssembly());
 
+builder.AddAzureServiceBusClient("servicebus");
+builder.Services.AddHostedService<Basket.EventHandlers.OrderPaidListener>();
+
 builder.AddJwtValidation();
 
 var app = builder.Build();

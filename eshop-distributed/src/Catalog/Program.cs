@@ -6,6 +6,17 @@ builder.AddServiceDefaults();
 
 builder.AddNpgsqlDbContext<ProductDbContext>(connectionName: "catalogdb");
 builder.Services.AddScoped<ProductService>();
+
+// Redis (the "cache" resource from the AppHost) is the shared L2 cache behind HybridCache.
+builder.AddRedisDistributedCache(connectionName: "cache");
+builder.Services.AddHybridCache(options =>
+{
+    options.DefaultEntryOptions = new()
+    {
+        Expiration = TimeSpan.FromMinutes(10),          // how long an entry lives in Redis
+        LocalCacheExpiration = TimeSpan.FromMinutes(1)  // how long this instance keeps it in memory
+    };
+});
 builder.Services.AddMassTransitWithAssemblies(Assembly.GetExecutingAssembly());
 
 builder.AddJwtValidation();

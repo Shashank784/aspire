@@ -732,6 +732,31 @@ textarea {
   margin: 20px 0 24px;
 }
 
+.payment {
+  max-width: 460px;
+  margin: 0 auto;
+  padding: 32px;
+}
+
+.payment .table {
+  margin: 16px 0 24px;
+}
+
+.payment-cancel {
+  margin-top: 10px;
+}
+
+.test-badge {
+  display: inline-block;
+  margin-bottom: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #fff4d6;
+  color: #8a5a00;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
 .success-mark {
   display: grid;
   place-items: center;

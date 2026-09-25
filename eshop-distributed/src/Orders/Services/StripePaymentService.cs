@@ -3,12 +3,12 @@ using Stripe.Checkout;
 
 namespace Orders.Services;
 
-public class StripePaymentService(IConfiguration configuration)
+public class StripePaymentService(IConfiguration configuration) : IPaymentService
 {
-    private readonly string _webAppBaseUrl = configuration["Stripe:WebAppBaseUrl"]
-        ?? throw new InvalidOperationException("Stripe:WebAppBaseUrl is not configured.");
+    private readonly string _webAppBaseUrl = configuration["Payment:WebAppBaseUrl"]
+        ?? throw new InvalidOperationException("Payment:WebAppBaseUrl is not configured.");
 
-    public async Task<Session> CreateCheckoutSessionAsync(Order order)
+    public async Task<CheckoutSession> CreateCheckoutSessionAsync(Order order)
     {
         var options = new SessionCreateOptions
         {
@@ -33,7 +33,8 @@ public class StripePaymentService(IConfiguration configuration)
         };
 
         var service = new SessionService();
-        return await service.CreateAsync(options);
+        var session = await service.CreateAsync(options);
+        return new CheckoutSession(session.Id, session.Url);
     }
 
     // Verifies the request really came from Stripe (signed with our webhook secret)

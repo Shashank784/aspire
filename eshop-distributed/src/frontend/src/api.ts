@@ -140,5 +140,7 @@ export const basketApi = {
 export const ordersApi = {
   checkout: () => request<{ orderId: number; checkoutUrl: string }>('POST', '/api/orders/checkout'),
   get: (id: number) => request<Order>('GET', `/api/orders/${id}`),
+  mockPay: (id: number) => request<Order>('POST', `/api/orders/${id}/mock-pay`),
+  cancel: (id: number) => request<Order>('POST', `/api/orders/${id}/cancel`),
   invoiceUrl: (id: number) => `/api/orders/${id}/invoice`,
 }

@@ -1,10 +1,9 @@
 
 1. React (what we have build till now ); Modern 
 2. make sure everything is running ;
-3. caching (redis)
+3. caching (redis) - remaining 
 4. event driven (where we can do ) (using service emulater) ;
-
-
+5. using BloB storage for the images  - remaining 
 UI 
 
 1. list page (product)
@@ -22,9 +21,19 @@ the order is confirmed
 
 
 
+//send grid id and pass 
+
+sagarshashank92@gmail.com
+Recovery Code : FK2DL9TQ5A268P5P48DXGBT4
+Password@123
 
 
+// new account 
+shashank.work321@gmail.com
+Shashank.work1992
 
+Recovery code
+:YMCZSHGF4YYPF6T2T8TV7C93
 
 
 
@@ -117,3 +126,28 @@ Here is the plan in order. Each step builds on the one before it.
 
 I can also update your `ReamaningTask.md` with this plan, so you can tick things off as we go.
 
+
+
+
+//remaining step to do in the sendgrid 
+
+
+Step 6: Save it in the project
+From eshop-distributed\src:
+
+
+dotnet user-secrets set "Parameters:sendgrid-api-key" "SG.paste-your-key-here" --project AppHost
+dotnet user-secrets set "Parameters:sendgrid-from-email" "your-verified-email@gmail.com" --project AppHost
+The from-email must be exactly the one you verified in Step 4.
+
+To check that they're saved (this prints the key, so don't screenshot it):
+
+
+dotnet user-secrets list --project AppHost
+Step 7: Test
+dotnet run --project AppHost
+Register a new user in the React app with your real email.
+Add a product → checkout → Pay.
+Check your inbox and your spam folder. Emails sent "from" a Gmail address through SendGrid often land in spam; that's normal for testing.
+On the SendGrid website, Activity Feed shows whether the email was delivered, bounced, or blocked.
+Common problems

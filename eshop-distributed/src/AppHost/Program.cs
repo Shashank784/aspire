@@ -18,11 +18,26 @@ var cache = builder
     //.WithDataVolume()
     .WithLifetime(ContainerLifetime.Persistent);
 
+// RabbitMQ (MassTransit) still carries the product-price-changed event.
 var rabbitmq = builder
     .AddRabbitMQ("rabbitmq")
     .WithManagementPlugin()
     //.WithDataVolume()
     .WithLifetime(ContainerLifetime.Persistent);
+
+// Azure Service Bus (local emulator) carries order events. The emulator can't create
+// entities at runtime, so the topic and its subscriptions are declared here.
+var serviceBus = builder
+    .AddAzureServiceBus("servicebus")
+    .RunAsEmulator(emulator => emulator.WithLifetime(ContainerLifetime.Persistent));
+
+var orderEvents = serviceBus.AddServiceBusTopic("order-events");
+orderEvents.AddServiceBusSubscription("basket-order-events", "basket");
+orderEvents.AddServiceBusSubscription("notification-order-events", "notification");
+
+// SendGrid settings — real values live in the AppHost's user secrets (Parameters:*).
+var sendGridApiKey = builder.AddParameter("sendgrid-api-key", secret: true);
+var sendGridFromEmail = builder.AddParameter("sendgrid-from-email");
 
 if (builder.ExecutionContext.IsRunMode)
 {
@@ -40,8 +55,10 @@ var identity = builder
 var catalog = builder
     .AddProject<Projects.Catalog>("catalog")
     .WithReference(catalogDb)
+    .WithReference(cache)
     .WithReference(rabbitmq)
     .WaitFor(catalogDb)
+    .WaitFor(cache)
     .WaitFor(rabbitmq);
 
 var basket = builder
@@ -49,15 +66,27 @@ var basket = builder
     .WithReference(cache)
     .WithReference(catalog)
     .WithReference(rabbitmq)
+    .WithReference(serviceBus)
     .WaitFor(cache)
-    .WaitFor(rabbitmq);
+    .WaitFor(rabbitmq)
+    .WaitFor(serviceBus);
 
 var orders = builder
     .AddProject<Projects.Orders>("orders")
     .WithReference(ordersDb)
     .WithReference(basket)
+    .WithReference(serviceBus)
     .WaitFor(ordersDb)
-    .WaitFor(basket);
+    .WaitFor(basket)
+    .WaitFor(serviceBus);
+
+// Listens for OrderPaid events and emails the customer through SendGrid.
+var notification = builder
+    .AddProject<Projects.Notification>("notification")
+    .WithReference(serviceBus)
+    .WaitFor(serviceBus)
+    .WithEnvironment("SendGrid__ApiKey", sendGridApiKey)
+    .WithEnvironment("SendGrid__FromEmail", sendGridFromEmail);
 
 var webapp = builder
     .AddProject<Projects.WebApp>("webapp")
@@ -91,7 +120,7 @@ var frontend = builder
     .WaitFor(bff)
     .WithExternalHttpEndpoints();
 
-// Stripe sends the customer back to the React app after payment.
-orders.WithEnvironment("Stripe__WebAppBaseUrl", frontend.GetEndpoint("http"));
+// The payment page (mock or Stripe) sends the customer back to the React app.
+orders.WithEnvironment("Payment__WebAppBaseUrl", frontend.GetEndpoint("http"));
 
 builder.Build().Run();

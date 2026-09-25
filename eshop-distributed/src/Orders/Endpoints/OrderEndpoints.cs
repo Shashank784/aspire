@@ -1,4 +1,3 @@
-using Orders.Authentication;
 using Stripe;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -11,13 +10,13 @@ public static class OrderEndpoints
     {
         var group = app.MapGroup("/orders");
 
-        // Creates an Order from the caller's current basket and starts a Stripe Checkout
-        // Session for it. Returns the URL the browser should be redirected to.
+        // Creates an Order from the caller's current basket and starts a checkout with the
+        // configured payment provider. Returns the URL the browser should be redirected to.
         group.MapPost("/checkout", async (
             ClaimsPrincipal user,
             BasketApiClient basketApiClient,
             OrderService orderService,
-            StripePaymentService stripePaymentService) =>
+            IPaymentService paymentService) =>
         {
             var userName = user.FindFirstValue(JwtRegisteredClaimNames.UniqueName) ?? user.Identity?.Name;
             if (string.IsNullOrEmpty(userName))
@@ -34,20 +33,20 @@ public static class OrderEndpoints
             var order = orderService.CreateFromCart(cart);
             await orderService.SaveChangesAsync();
 
-            Stripe.Checkout.Session session;
+            CheckoutSession session;
             try
             {
-                session = await stripePaymentService.CreateCheckoutSessionAsync(order);
+                session = await paymentService.CreateCheckoutSessionAsync(order);
             }
             catch (StripeException ex)
             {
                 return Results.Problem($"Failed to start checkout with Stripe: {ex.Message}");
             }
 
-            order.StripeSessionId = session.Id;
+            order.StripeSessionId = session.SessionId;
             await orderService.SaveChangesAsync();
 
-            return Results.Ok(new { orderId = order.Id, checkoutUrl = session.Url });
+            return Results.Ok(new { orderId = order.Id, checkoutUrl = session.CheckoutUrl });
         })
         .WithName("Checkout")
         .RequireAuthorization("UserOnly");
@@ -56,9 +55,7 @@ public static class OrderEndpoints
         group.MapPost("/webhook", async (
             HttpRequest request,
             OrderService orderService,
-            BasketApiClient basketApiClient,
-            StripePaymentService stripePaymentService,
-            InternalTokenService internalTokenService) =>
+            StripePaymentService stripePaymentService) =>
         {
             using var reader = new StreamReader(request.Body);
             var json = await reader.ReadToEndAsync();
@@ -77,16 +74,9 @@ public static class OrderEndpoints
                 stripeEvent.Data.Object is Stripe.Checkout.Session session)
             {
                 var order = await orderService.GetByStripeSessionIdAsync(session.Id);
-                if (order is not null && order.Status != OrderStatus.Paid)
+                if (order is not null)
                 {
-                    order.Status = OrderStatus.Paid;
-                    order.PaidAtUtc = DateTime.UtcNow;
-                    await orderService.SaveChangesAsync();
-
-                    // No logged-in user is attached to this webhook call, so we use an
-                    // internally minted service token to clear the customer's basket.
-                    var serviceToken = internalTokenService.CreateServiceToken();
-                    await basketApiClient.DeleteBasket(order.UserName, serviceToken);
+                    await orderService.MarkPaidAsync(order);
                 }
             }
 
@@ -94,6 +84,62 @@ public static class OrderEndpoints
         })
         .WithName("StripeWebhook")
         .AllowAnonymous();
+
+        // The mock provider's "Pay" button. Only exists when Payment:Provider is Mock —
+        // otherwise anyone could mark their own order paid without paying.
+        group.MapPost("/{id:int}/mock-pay", async (int id, ClaimsPrincipal user, OrderService orderService, IPaymentService paymentService) =>
+        {
+            if (paymentService is not MockPaymentService)
+            {
+                return Results.NotFound();
+            }
+
+            var order = await orderService.GetByIdAsync(id);
+            if (order is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (!user.OwnsOrder(order))
+            {
+                return Results.Forbid();
+            }
+
+            if (order.Status == OrderStatus.Cancelled)
+            {
+                return Results.BadRequest("This order was cancelled.");
+            }
+
+            await orderService.MarkPaidAsync(order);
+            return Results.Ok(order);
+        })
+        .WithName("MockPayOrder")
+        .RequireAuthorization("UserOnly");
+
+        // Called when the customer backs out of payment. Only unpaid orders can be cancelled.
+        group.MapPost("/{id:int}/cancel", async (int id, ClaimsPrincipal user, OrderService orderService) =>
+        {
+            var order = await orderService.GetByIdAsync(id);
+            if (order is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (!user.OwnsOrder(order))
+            {
+                return Results.Forbid();
+            }
+
+            if (order.Status == OrderStatus.Pending)
+            {
+                order.Status = OrderStatus.Cancelled;
+                await orderService.SaveChangesAsync();
+            }
+
+            return Results.Ok(order);
+        })
+        .WithName("CancelOrder")
+        .RequireAuthorization("UserOnly");
 
         // GET order details, used by the order-confirmation page.
         group.MapGet("/{id:int}", async (int id, ClaimsPrincipal user, OrderService orderService) =>
