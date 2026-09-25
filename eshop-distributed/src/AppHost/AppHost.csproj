@@ -25,7 +25,6 @@
     <ProjectReference Include="..\Catalog\Catalog.csproj" />
     <ProjectReference Include="..\Identity\Identity.csproj" />
     <ProjectReference Include="..\Orders\Orders.csproj" />
-    <ProjectReference Include="..\WebApp\WebApp.csproj" />
     <ProjectReference Include="..\Bff\Bff.csproj" />
     <ProjectReference Include="..\Notification\Notification.csproj" />
   </ItemGroup>

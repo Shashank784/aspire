@@ -88,19 +88,6 @@ var notification = builder
     .WithEnvironment("SendGrid__ApiKey", sendGridApiKey)
     .WithEnvironment("SendGrid__FromEmail", sendGridFromEmail);
 
-var webapp = builder
-    .AddProject<Projects.WebApp>("webapp")
-    .WithExternalHttpEndpoints()
-    .WithReference(cache)
-    .WithReference(catalog)
-    .WithReference(basket)
-    .WithReference(identity)
-    .WithReference(orders)
-    .WaitFor(catalog)
-    .WaitFor(basket)
-    .WaitFor(identity)
-    .WaitFor(orders);
-
 // React frontend: the Vite dev server proxies /api and /bff to the BFF, which holds the
 // login cookie and forwards API calls to the services with the user's JWT attached.
 var bff = builder
