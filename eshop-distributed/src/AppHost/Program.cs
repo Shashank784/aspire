@@ -10,6 +10,7 @@ var postgres = builder
 
 var catalogDb = postgres.AddDatabase("catalogdb");
 var identityDb = postgres.AddDatabase("identitydb");
+var ordersDb = postgres.AddDatabase("ordersdb");
 
 var cache = builder
     .AddRedis("cache")
@@ -51,6 +52,13 @@ var basket = builder
     .WaitFor(cache)
     .WaitFor(rabbitmq);
 
+var orders = builder
+    .AddProject<Projects.Orders>("orders")
+    .WithReference(ordersDb)
+    .WithReference(basket)
+    .WaitFor(ordersDb)
+    .WaitFor(basket);
+
 var webapp = builder
     .AddProject<Projects.WebApp>("webapp")
     .WithExternalHttpEndpoints()
@@ -58,8 +66,10 @@ var webapp = builder
     .WithReference(catalog)
     .WithReference(basket)
     .WithReference(identity)
+    .WithReference(orders)
     .WaitFor(catalog)
     .WaitFor(basket)
-    .WaitFor(identity);
+    .WaitFor(identity)
+    .WaitFor(orders);
 
 builder.Build().Run();

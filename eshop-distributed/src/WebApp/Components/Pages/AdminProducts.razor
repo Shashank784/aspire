@@ -3,48 +3,137 @@
 @using Catalog.Models
 @using WebApp.ApiClients
 @inject CatalogApiClient CatalogApiClient
+@inject NavigationManager NavigationManager
 
 <PageTitle>Admin - Products</PageTitle>
 
-<h1>Admin: Add Product</h1>
+@if (!string.IsNullOrEmpty(statusMessage))
+{
+    <div class="alert alert-info">@statusMessage</div>
+}
 
-<EditForm Model="newProduct" OnValidSubmit="CreateAsync" FormName="admin-add-product" method="post">
-    <DataAnnotationsValidator />
-    <ValidationSummary class="text-danger" role="alert" />
+@if (editProduct is not null)
+{
+    <h1>Admin: Edit Product</h1>
 
-    @if (!string.IsNullOrEmpty(statusMessage))
+    <EditForm Model="editProduct" OnValidSubmit="UpdateAsync" FormName="admin-edit-product" method="post" action="@($"?editId={EditId}")">
+        <DataAnnotationsValidator />
+        <ValidationSummary class="text-danger" role="alert" />
+
+        <div class="mb-3">
+            <label>Name</label>
+            <InputText @bind-Value="editProduct!.Name" class="form-control" />
+        </div>
+        <div class="mb-3">
+            <label>Description</label>
+            <InputText @bind-Value="editProduct!.Description" class="form-control" />
+        </div>
+        <div class="mb-3">
+            <label>Price</label>
+            <InputNumber @bind-Value="editProduct!.Price" class="form-control" />
+        </div>
+        <div class="mb-3">
+            <label>Image URL</label>
+            <InputText @bind-Value="editProduct!.ImageUrl" class="form-control" placeholder="https://example.com/my-product.png" />
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save changes</button>
+        <a href="/admin/products" class="btn btn-secondary">Cancel</a>
+    </EditForm>
+}
+else
+{
+    <h1>Admin: Add Product</h1>
+
+    <EditForm Model="newProduct" OnValidSubmit="CreateAsync" FormName="admin-add-product" method="post">
+        <DataAnnotationsValidator />
+        <ValidationSummary class="text-danger" role="alert" />
+
+        <div class="mb-3">
+            <label>Name</label>
+            <InputText @bind-Value="newProduct!.Name" class="form-control" />
+        </div>
+        <div class="mb-3">
+            <label>Description</label>
+            <InputText @bind-Value="newProduct!.Description" class="form-control" />
+        </div>
+        <div class="mb-3">
+            <label>Price</label>
+            <InputNumber @bind-Value="newProduct!.Price" class="form-control" />
+        </div>
+        <div class="mb-3">
+            <label>Image URL</label>
+            <InputText @bind-Value="newProduct!.ImageUrl" class="form-control" placeholder="https://example.com/my-product.png" />
+            <div class="form-text">Paste a full image URL (https://...). Bare filenames are only resolved for the original seeded products.</div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Create product</button>
+    </EditForm>
+
+    <h2 class="mt-4">Existing Products</h2>
+
+    @if (products is null)
     {
-        <div class="alert alert-info">@statusMessage</div>
+        <p>Loading...</p>
     }
-
-    <div class="mb-3">
-        <label>Name</label>
-        <InputText @bind-Value="newProduct!.Name" class="form-control" />
-    </div>
-    <div class="mb-3">
-        <label>Description</label>
-        <InputText @bind-Value="newProduct!.Description" class="form-control" />
-    </div>
-    <div class="mb-3">
-        <label>Price</label>
-        <InputNumber @bind-Value="newProduct!.Price" class="form-control" />
-    </div>
-    <div class="mb-3">
-        <label>Image URL</label>
-        <InputText @bind-Value="newProduct!.ImageUrl" class="form-control" placeholder="https://example.com/my-product.png" />
-        <div class="form-text">Paste a full image URL (https://...). Bare filenames are only resolved for the original seeded products.</div>
-    </div>
-
-    <button type="submit" class="btn btn-primary">Create product</button>
-</EditForm>
+    else if (products.Count == 0)
+    {
+        <p>No products yet.</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th>Price</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var product in products)
+                {
+                    <tr>
+                        <td>@product.Name</td>
+                        <td>@product.Description</td>
+                        <td>@product.Price.ToString("C")</td>
+                        <td>
+                            <a href="/admin/products?editId=@product.Id" class="btn btn-sm btn-outline-primary">Edit</a>
+                            <EditForm Model="product" FormName="@($"delete-{product.Id}")" OnValidSubmit="@(() => DeleteAsync(product.Id))" method="post" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                            </EditForm>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
 
 @code {
-    [SupplyParameterFromForm]
+    [SupplyParameterFromQuery]
+    private int? EditId { get; set; }
+
+    [SupplyParameterFromForm(FormName = "admin-add-product")]
     private Product? newProduct { get; set; }
 
+    [SupplyParameterFromForm(FormName = "admin-edit-product")]
+    private Product? editProduct { get; set; }
+
+    private List<Product>? products;
     private string? statusMessage;
 
-    protected override void OnInitialized() => newProduct ??= new();
+    protected override async Task OnInitializedAsync()
+    {
+        newProduct ??= new();
+        products = await CatalogApiClient.GetProducts();
+
+        if (EditId is int id && editProduct is null)
+        {
+            editProduct = await CatalogApiClient.GetProductById(id);
+        }
+    }
 
     private async Task CreateAsync()
     {
@@ -56,6 +145,38 @@
         if (created is not null)
         {
             newProduct = new Product();
+            NavigationManager.NavigateTo("/admin/products", forceLoad: true);
+        }
+    }
+
+    private async Task UpdateAsync()
+    {
+        if (EditId is not int id)
+        {
+            return;
+        }
+
+        var success = await CatalogApiClient.UpdateProduct(id, editProduct!);
+        if (success)
+        {
+            NavigationManager.NavigateTo("/admin/products", forceLoad: true);
+        }
+        else
+        {
+            statusMessage = "Failed to update product.";
+        }
+    }
+
+    private async Task DeleteAsync(int id)
+    {
+        var success = await CatalogApiClient.DeleteProduct(id);
+        if (success)
+        {
+            NavigationManager.NavigateTo("/admin/products", forceLoad: true);
+        }
+        else
+        {
+            statusMessage = "Failed to delete product.";
         }
     }
 }

@@ -32,4 +32,18 @@ public class CatalogApiClient(HttpClient httpClient)
 
         return await response.Content.ReadFromJsonAsync<Product>();
     }
+
+    // Admin-only on the Catalog side (RequireAuthorization("AdminOnly")).
+    public async Task<bool> UpdateProduct(int id, Product product)
+    {
+        var response = await httpClient.PutAsJsonAsync($"/products/{id}", product);
+        return response.IsSuccessStatusCode;
+    }
+
+    // Admin-only on the Catalog side (RequireAuthorization("AdminOnly")).
+    public async Task<bool> DeleteProduct(int id)
+    {
+        var response = await httpClient.DeleteAsync($"/products/{id}");
+        return response.IsSuccessStatusCode;
+    }
 }

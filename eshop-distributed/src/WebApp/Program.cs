@@ -46,6 +46,12 @@ builder.Services.AddHttpClient<BasketApiClient>(client =>
 })
 .AddHttpMessageHandler<BearerTokenHandler>();
 
+builder.Services.AddHttpClient<OrdersApiClient>(client =>
+{
+    client.BaseAddress = new("https+http://orders");
+})
+.AddHttpMessageHandler<BearerTokenHandler>();
+
 builder.Services.AddScoped<BasketActions>();
 
 builder.AddRedisOutputCache("cache");
@@ -80,6 +86,18 @@ app.MapPost("/account/logout", async (HttpContext httpContext) =>
     await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
     return Results.LocalRedirect("/");
 });
+
+// A plain <a href> can't carry a Bearer token, so the invoice download goes through this
+// cookie-authenticated endpoint, which fetches the PDF from Orders (via BearerTokenHandler,
+// using the JWT stashed in the cookie) and streams it back to the browser.
+app.MapGet("/downloads/invoice/{id:int}", async (int id, OrdersApiClient ordersApiClient) =>
+{
+    var pdfBytes = await ordersApiClient.DownloadInvoicePdf(id);
+    return pdfBytes is not null
+        ? Results.File(pdfBytes, "application/pdf", $"invoice-{id}.pdf")
+        : Results.NotFound();
+})
+.RequireAuthorization();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()

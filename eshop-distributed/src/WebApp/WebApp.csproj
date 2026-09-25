@@ -10,6 +10,8 @@
     <Compile Include="..\Catalog\Models\Product.cs" Link="Models\Product.cs" />
     <Compile Include="..\Basket\Models\ShoppingCart.cs" Link="Models\ShoppingCart.cs" />
     <Compile Include="..\Basket\Models\ShoppingCartItem.cs" Link="Models\ShoppingCartItem.cs" />
+    <Compile Include="..\Orders\Models\Order.cs" Link="Models\Order.cs" />
+    <Compile Include="..\Orders\Models\OrderItem.cs" Link="Models\OrderItem.cs" />
   </ItemGroup>
 
   <ItemGroup>
