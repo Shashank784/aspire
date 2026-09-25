@@ -785,6 +785,26 @@ textarea {
   top: 84px;
 }
 
+.image-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.image-preview img {
+  width: 96px;
+  height: 72px;
+  object-fit: contain;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+input[type='file'] {
+  padding: 8px;
+  font-size: 0.85rem;
+}
+
 .admin-list {
   padding: 20px;
   overflow-x: auto;

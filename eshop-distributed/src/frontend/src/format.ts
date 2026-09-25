@@ -8,13 +8,28 @@ export const formatPrice = (value: number) => inr.format(value)
 export const formatDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : ''
 
-// Seeded products store a bare filename that lives in a demo image repo; products
-// created from the Admin page store a full image URL.
+const NO_IMAGE =
+  'data:image/svg+xml;utf8,' +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 90"><rect width="120" height="90" fill="#eef0f3"/><text x="60" y="50" font-family="sans-serif" font-size="11" fill="#8a929e" text-anchor="middle">No image</text></svg>',
+  )
+
+// Where a product's image comes from, based on what Catalog stored in imageUrl:
+//   "uploads/<guid>.png" -> uploaded by an admin, served by Catalog from blob storage
+//   "https://..."        -> a full external link
+//   "product2.png"       -> an original seeded product, hosted in a demo image repo
 export function productImage(product: Product): string {
-  if (/^https?:\/\//i.test(product.imageUrl)) {
-    return product.imageUrl
+  const imageUrl = product.imageUrl ?? ''
+  if (!imageUrl) {
+    return NO_IMAGE
   }
-  return `https://raw.githubusercontent.com/MicrosoftDocs/mslearn-dotnet-cloudnative/main/dotnet-docker/Products/wwwroot/images/${product.imageUrl}`
+  if (imageUrl.startsWith('uploads/')) {
+    return `/api/products/images/${imageUrl}`
+  }
+  if (/^https?:\/\//i.test(imageUrl)) {
+    return imageUrl
+  }
+  return `https://raw.githubusercontent.com/MicrosoftDocs/mslearn-dotnet-cloudnative/main/dotnet-docker/Products/wwwroot/images/${imageUrl}`
 }
 
 // Only allow in-app return URLs after login (never "//evil.com" or "https://...").

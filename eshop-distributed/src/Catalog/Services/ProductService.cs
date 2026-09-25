@@ -7,7 +7,7 @@ namespace Catalog.Services;
 // Reads go through HybridCache: a small in-memory cache (L1) in front of Redis (L2), with the
 // database only hit on a miss. Every write clears all product entries via the shared tag, so
 // the next read reloads fresh data.
-public class ProductService(ProductDbContext dbContext, IBus bus, HybridCache cache, ILogger<ProductService> logger)
+public class ProductService(ProductDbContext dbContext, IBus bus, HybridCache cache, ProductImageStorage imageStorage, ILogger<ProductService> logger)
 {
     private const string ProductsTag = "products";
     private static readonly string[] Tags = [ProductsTag];
@@ -89,6 +89,19 @@ public class ProductService(ProductDbContext dbContext, IBus bus, HybridCache ca
         dbContext.Products.Remove(deletedProduct);
         await dbContext.SaveChangesAsync();
         await cache.RemoveByTagAsync(ProductsTag);
+        await imageStorage.DeleteIfUploadedAsync(deletedProduct.ImageUrl);
+    }
+
+    // Uploads the new image, points the product at it, then removes the old uploaded image.
+    public async Task SetProductImageAsync(Product product, Stream content, string contentType)
+    {
+        var oldImageUrl = product.ImageUrl;
+
+        product.ImageUrl = await imageStorage.UploadAsync(content, contentType);
+        await dbContext.SaveChangesAsync();
+        await cache.RemoveByTagAsync(ProductsTag);
+
+        await imageStorage.DeleteIfUploadedAsync(oldImageUrl);
     }
 
     public async Task<IEnumerable<Product>> SearchProductsAsync(string query)

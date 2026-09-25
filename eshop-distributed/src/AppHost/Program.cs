@@ -35,6 +35,16 @@ var orderEvents = serviceBus.AddServiceBusTopic("order-events");
 orderEvents.AddServiceBusSubscription("basket-order-events", "basket");
 orderEvents.AddServiceBusSubscription("notification-order-events", "notification");
 
+// Azure Storage (local Azurite emulator) holds uploaded product images.
+// The data volume keeps the images when the container is recreated.
+var storage = builder
+    .AddAzureStorage("storage")
+    .RunAsEmulator(emulator => emulator
+        .WithDataVolume()
+        .WithLifetime(ContainerLifetime.Persistent));
+
+var productImages = storage.AddBlobContainer("product-images");
+
 // SendGrid settings — real values live in the AppHost's user secrets (Parameters:*).
 var sendGridApiKey = builder.AddParameter("sendgrid-api-key", secret: true);
 var sendGridFromEmail = builder.AddParameter("sendgrid-from-email");
@@ -57,7 +67,9 @@ var catalog = builder
     .WithReference(catalogDb)
     .WithReference(cache)
     .WithReference(rabbitmq)
+    .WithReference(productImages)
     .WaitFor(catalogDb)
+    .WaitFor(productImages)
     .WaitFor(cache)
     .WaitFor(rabbitmq);
 

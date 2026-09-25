@@ -66,14 +66,16 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
   if (method !== 'GET') {
     headers['X-CSRF'] = '1' // required by the BFF on every write
   }
-  if (body !== undefined) {
+  // FormData (file uploads) sets its own multipart Content-Type; everything else is JSON.
+  const isForm = body instanceof FormData
+  if (body !== undefined && !isForm) {
     headers['Content-Type'] = 'application/json'
   }
 
   const response = await fetch(url, {
     method,
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
     credentials: 'same-origin',
   })
 
@@ -120,6 +122,11 @@ export const catalogApi = {
   create: (product: ProductInput) => request<Product>('POST', '/api/products', product),
   update: (id: number, product: ProductInput) => request<void>('PUT', `/api/products/${id}`, product),
   remove: (id: number) => request<void>('DELETE', `/api/products/${id}`),
+  uploadImage: (id: number, file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return request<Product>('POST', `/api/products/${id}/image`, form)
+  },
 }
 
 export const basketApi = {

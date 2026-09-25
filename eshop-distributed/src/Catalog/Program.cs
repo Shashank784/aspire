@@ -7,6 +7,10 @@ builder.AddServiceDefaults();
 builder.AddNpgsqlDbContext<ProductDbContext>(connectionName: "catalogdb");
 builder.Services.AddScoped<ProductService>();
 
+// Blob container for uploaded product images ("product-images" from the AppHost).
+builder.AddAzureBlobContainerClient("product-images");
+builder.Services.AddSingleton<ProductImageStorage>();
+
 // Redis (the "cache" resource from the AppHost) is the shared L2 cache behind HybridCache.
 builder.AddRedisDistributedCache(connectionName: "cache");
 builder.Services.AddHybridCache(options =>

@@ -1,25 +1,24 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { catalogApi, type Product } from '../api'
 import { Spinner } from '../components/Spinner'
 import { formatPrice, productImage } from '../format'
 
-type ProductForm = { name: string; description: string; price: string; imageUrl: string }
+type ProductForm = { name: string; description: string; price: string }
 
-const emptyForm: ProductForm = { name: '', description: '', price: '', imageUrl: '' }
+const emptyForm: ProductForm = { name: '', description: '', price: '' }
 
-const toForm = (p: Product): ProductForm => ({
-  name: p.name,
-  description: p.description,
-  price: String(p.price),
-  imageUrl: p.imageUrl,
-})
+const MAX_IMAGE_MB = 5
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 
 export function AdminProducts() {
   const [products, setProducts] = useState<Product[] | null>(null)
   const [form, setForm] = useState<ProductForm>(emptyForm)
-  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editing, setEditing] = useState<Product | null>(null)
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [busy, setBusy] = useState(false)
+  const fileInput = useRef<HTMLInputElement>(null)
 
   const load = useCallback(() => {
     catalogApi
@@ -30,16 +29,50 @@ export function AdminProducts() {
 
   useEffect(load, [load])
 
+  // Free the temporary preview URL when it's replaced or the page closes.
+  useEffect(() => () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl)
+  }, [previewUrl])
+
+  const resetImage = () => {
+    setImageFile(null)
+    setPreviewUrl(null)
+    if (fileInput.current) fileInput.current.value = ''
+  }
+
   const startEdit = (product: Product) => {
-    setEditingId(product.id)
-    setForm(toForm(product))
+    setEditing(product)
+    setForm({ name: product.name, description: product.description, price: String(product.price) })
+    resetImage()
     setMessage(null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const cancelEdit = () => {
-    setEditingId(null)
+    setEditing(null)
     setForm(emptyForm)
+    resetImage()
+  }
+
+  const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null
+    if (!file) {
+      resetImage()
+      return
+    }
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setMessage({ type: 'error', text: 'Please choose a JPEG, PNG, WebP or GIF image.' })
+      resetImage()
+      return
+    }
+    if (file.size > MAX_IMAGE_MB * 1024 * 1024) {
+      setMessage({ type: 'error', text: `Image must be smaller than ${MAX_IMAGE_MB} MB.` })
+      resetImage()
+      return
+    }
+    setMessage(null)
+    setImageFile(file)
+    setPreviewUrl(URL.createObjectURL(file))
   }
 
   const handleSubmit = async (event: FormEvent) => {
@@ -49,22 +82,40 @@ export function AdminProducts() {
       setMessage({ type: 'error', text: 'Please enter a valid price.' })
       return
     }
+    if (!editing && !imageFile) {
+      setMessage({ type: 'error', text: 'Please choose an image for the new product.' })
+      return
+    }
 
-    const input = { name: form.name.trim(), description: form.description.trim(), price, imageUrl: form.imageUrl.trim() }
+    // The image is uploaded separately (after the product exists), so keep the current one on edit.
+    const input = {
+      name: form.name.trim(),
+      description: form.description.trim(),
+      price,
+      imageUrl: editing?.imageUrl ?? '',
+    }
+
     setBusy(true)
     setMessage(null)
     try {
-      if (editingId === null) {
-        const created = await catalogApi.create(input)
-        setMessage({ type: 'success', text: `Created “${created.name}”.` })
+      let saved: Product
+      if (editing) {
+        await catalogApi.update(editing.id, input)
+        saved = { ...editing, ...input }
       } else {
-        await catalogApi.update(editingId, input)
-        setMessage({ type: 'success', text: `Saved “${input.name}”.` })
+        saved = await catalogApi.create(input)
       }
+
+      if (imageFile) {
+        await catalogApi.uploadImage(saved.id, imageFile)
+      }
+
+      setMessage({ type: 'success', text: `${editing ? 'Saved' : 'Created'} “${saved.name}”.` })
       cancelEdit()
       load()
     } catch (e) {
       setMessage({ type: 'error', text: e instanceof Error ? e.message : 'Failed to save product.' })
+      load()
     } finally {
       setBusy(false)
     }
@@ -75,7 +126,7 @@ export function AdminProducts() {
     try {
       await catalogApi.remove(product.id)
       setMessage({ type: 'success', text: `Deleted “${product.name}”.` })
-      if (editingId === product.id) cancelEdit()
+      if (editing?.id === product.id) cancelEdit()
       load()
     } catch {
       setMessage({ type: 'error', text: 'Failed to delete product.' })
@@ -87,6 +138,8 @@ export function AdminProducts() {
     onChange: (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value }),
   })
 
+  const shownImage = previewUrl ?? (editing ? productImage(editing) : null)
+
   return (
     <>
       <h1>Admin · Products</h1>
@@ -95,7 +148,7 @@ export function AdminProducts() {
 
       <div className="admin-layout">
         <form className="card form admin-form" onSubmit={handleSubmit}>
-          <h2>{editingId === null ? 'Add product' : `Edit product #${editingId}`}</h2>
+          <h2>{editing ? `Edit product #${editing.id}` : 'Add product'}</h2>
           <label>
             Name
             <input {...field('name')} required />
@@ -109,15 +162,23 @@ export function AdminProducts() {
             <input {...field('price')} type="number" min="0" step="0.01" required />
           </label>
           <label>
-            Image URL
-            <input {...field('imageUrl')} placeholder="https://example.com/my-product.png" required />
-            <span className="hint">Paste a full image URL. Bare file names only work for the original seeded products.</span>
+            Image
+            <input ref={fileInput} type="file" accept={ALLOWED_TYPES.join(',')} onChange={handleImageChange} />
+            <span className="hint">
+              JPEG, PNG, WebP or GIF, up to {MAX_IMAGE_MB} MB.{editing && ' Leave empty to keep the current image.'}
+            </span>
           </label>
+          {shownImage && (
+            <div className="image-preview">
+              <img src={shownImage} alt="Product preview" />
+              <span className="muted small">{previewUrl ? 'New image' : 'Current image'}</span>
+            </div>
+          )}
           <div className="actions">
             <button type="submit" className="btn btn-primary" disabled={busy}>
-              {busy ? 'Saving...' : editingId === null ? 'Create product' : 'Save changes'}
+              {busy ? 'Saving...' : editing ? 'Save changes' : 'Create product'}
             </button>
-            {editingId !== null && (
+            {editing && (
               <button type="button" className="btn btn-ghost" onClick={cancelEdit}>
                 Cancel
               </button>
@@ -143,7 +204,7 @@ export function AdminProducts() {
               </thead>
               <tbody>
                 {products.map((product) => (
-                  <tr key={product.id} className={editingId === product.id ? 'row-active' : undefined}>
+                  <tr key={product.id} className={editing?.id === product.id ? 'row-active' : undefined}>
                     <td>
                       <img className="thumb" src={productImage(product)} alt="" />
                     </td>
