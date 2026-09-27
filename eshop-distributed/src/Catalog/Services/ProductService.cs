@@ -1,4 +1,4 @@
-using MassTransit;
+using Azure.Messaging.ServiceBus;
 using Microsoft.Extensions.Caching.Hybrid;
 using ServiceDefaults.Messaging.Events;
 
@@ -7,7 +7,7 @@ namespace Catalog.Services;
 // Reads go through HybridCache: a small in-memory cache (L1) in front of Redis (L2), with the
 // database only hit on a miss. Every write clears all product entries via the shared tag, so
 // the next read reloads fresh data.
-public class ProductService(ProductDbContext dbContext, IBus bus, HybridCache cache, ProductImageStorage imageStorage, ILogger<ProductService> logger)
+public class ProductService(ProductDbContext dbContext, ServiceBusClient serviceBusClient, HybridCache cache, ProductImageStorage imageStorage, ILogger<ProductService> logger)
 {
     private const string ProductsTag = "products";
     private static readonly string[] Tags = [ProductsTag];
@@ -70,7 +70,12 @@ public class ProductService(ProductDbContext dbContext, IBus bus, HybridCache ca
                 Price = inputProduct.Price, //set updated product price
                 ImageUrl = inputProduct.ImageUrl
             };
-            await bus.Publish(integrationEvent);
+            await using var sender = serviceBusClient.CreateSender("product-events");
+            await sender.SendMessageAsync(new ServiceBusMessage(BinaryData.FromObjectAsJson(integrationEvent))
+            {
+                Subject = nameof(ProductPriceChangedIntegrationEvent),
+                MessageId = integrationEvent.EventId.ToString()
+            });
         }
 
         // update product with new values

@@ -21,7 +21,8 @@ builder.Services.AddHybridCache(options =>
         LocalCacheExpiration = TimeSpan.FromMinutes(1)  // how long this instance keeps it in memory
     };
 });
-builder.Services.AddMassTransitWithAssemblies(Assembly.GetExecutingAssembly());
+// Service Bus: price changes are published to the "product-events" topic.
+builder.AddAzureServiceBusClient("servicebus");
 
 builder.AddJwtValidation();
 

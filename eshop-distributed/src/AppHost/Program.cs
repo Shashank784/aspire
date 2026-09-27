@@ -18,15 +18,8 @@ var cache = builder
     //.WithDataVolume()
     .WithLifetime(ContainerLifetime.Persistent);
 
-// RabbitMQ (MassTransit) still carries the product-price-changed event.
-var rabbitmq = builder
-    .AddRabbitMQ("rabbitmq")
-    .WithManagementPlugin()
-    //.WithDataVolume()
-    .WithLifetime(ContainerLifetime.Persistent);
-
-// Azure Service Bus (local emulator) carries order events. The emulator can't create
-// entities at runtime, so the topic and its subscriptions are declared here.
+// Azure Service Bus (local emulator) carries all integration events. The emulator can't
+// create entities at runtime, so the topics and their subscriptions are declared here.
 var serviceBus = builder
     .AddAzureServiceBus("servicebus")
     .RunAsEmulator(emulator => emulator.WithLifetime(ContainerLifetime.Persistent));
@@ -34,6 +27,9 @@ var serviceBus = builder
 var orderEvents = serviceBus.AddServiceBusTopic("order-events");
 orderEvents.AddServiceBusSubscription("basket-order-events", "basket");
 orderEvents.AddServiceBusSubscription("notification-order-events", "notification");
+
+var productEvents = serviceBus.AddServiceBusTopic("product-events");
+productEvents.AddServiceBusSubscription("basket-product-events", "basket");
 
 // Azure Storage (local Azurite emulator) holds uploaded product images.
 // The data volume keeps the images when the container is recreated.
@@ -53,7 +49,6 @@ if (builder.ExecutionContext.IsRunMode)
 {
     // Data volumes don't work on ACA for Postgres so only add when running
     postgres.WithDataVolume();
-    rabbitmq.WithDataVolume();
 }
 
 // Projects
@@ -66,21 +61,19 @@ var catalog = builder
     .AddProject<Projects.Catalog>("catalog")
     .WithReference(catalogDb)
     .WithReference(cache)
-    .WithReference(rabbitmq)
+    .WithReference(serviceBus)
     .WithReference(productImages)
     .WaitFor(catalogDb)
     .WaitFor(productImages)
     .WaitFor(cache)
-    .WaitFor(rabbitmq);
+    .WaitFor(serviceBus);
 
 var basket = builder
     .AddProject<Projects.Basket>("basket")
     .WithReference(cache)
     .WithReference(catalog)
-    .WithReference(rabbitmq)
     .WithReference(serviceBus)
     .WaitFor(cache)
-    .WaitFor(rabbitmq)
     .WaitFor(serviceBus);
 
 var orders = builder

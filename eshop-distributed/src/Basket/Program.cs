@@ -11,10 +11,9 @@ builder.Services.AddHttpClient<CatalogApiClient>(client =>
     client.BaseAddress = new("https+http://catalog");
 });
 
-builder.Services.AddMassTransitWithAssemblies(Assembly.GetExecutingAssembly());
-
 builder.AddAzureServiceBusClient("servicebus");
 builder.Services.AddHostedService<Basket.EventHandlers.OrderPaidListener>();
+builder.Services.AddHostedService<Basket.EventHandlers.ProductPriceChangedListener>();
 
 builder.AddJwtValidation();
 
