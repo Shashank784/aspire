@@ -106,13 +106,10 @@ var bff = builder
     .WaitFor(basket)
     .WaitFor(orders);
 
-var frontend = builder
+builder
     .AddViteApp("frontend", "../frontend")
     .WithReference(bff)
     .WaitFor(bff)
     .WithExternalHttpEndpoints();
-
-// The payment page (mock or Stripe) sends the customer back to the React app.
-orders.WithEnvironment("Payment__WebAppBaseUrl", frontend.GetEndpoint("http"));
 
 builder.Build().Run();

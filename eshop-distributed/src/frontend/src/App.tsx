@@ -5,6 +5,7 @@ import { AdminProducts } from './pages/AdminProducts'
 import { BasketPage } from './pages/BasketPage'
 import { Login } from './pages/Login'
 import { MockPayment } from './pages/MockPayment'
+import { MyOrders } from './pages/MyOrders'
 import { OrderCancelled } from './pages/OrderCancelled'
 import { OrderConfirmation } from './pages/OrderConfirmation'
 import { ProductDetails } from './pages/ProductDetails'
@@ -20,10 +21,11 @@ export default function App() {
         <Route path="products/:id" element={<ProductDetails />} />
         <Route path="login" element={<Login />} />
         <Route path="register" element={<Register />} />
-        <Route path="basket" element={<RequireAuth><BasketPage /></RequireAuth>} />
-        <Route path="mock-payment" element={<RequireAuth><MockPayment /></RequireAuth>} />
-        <Route path="order-confirmation" element={<RequireAuth><OrderConfirmation /></RequireAuth>} />
-        <Route path="order-cancelled" element={<RequireAuth><OrderCancelled /></RequireAuth>} />
+        <Route path="basket" element={<RequireAuth customerOnly><BasketPage /></RequireAuth>} />
+        <Route path="orders" element={<RequireAuth customerOnly><MyOrders /></RequireAuth>} />
+        <Route path="mock-payment" element={<RequireAuth customerOnly><MockPayment /></RequireAuth>} />
+        <Route path="order-confirmation" element={<RequireAuth customerOnly><OrderConfirmation /></RequireAuth>} />
+        <Route path="order-cancelled" element={<RequireAuth customerOnly><OrderCancelled /></RequireAuth>} />
         <Route path="admin/products" element={<RequireAuth role="Admin"><AdminProducts /></RequireAuth>} />
         <Route
           path="*"

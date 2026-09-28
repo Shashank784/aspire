@@ -1,4 +1,3 @@
-using Stripe;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
@@ -10,13 +9,12 @@ public static class OrderEndpoints
     {
         var group = app.MapGroup("/orders");
 
-        // Creates an Order from the caller's current basket and starts a checkout with the
-        // configured payment provider. Returns the URL the browser should be redirected to.
+        // Creates a Pending Order from the caller's current basket. The React app then opens
+        // its /mock-payment page for that order.
         group.MapPost("/checkout", async (
             ClaimsPrincipal user,
             BasketApiClient basketApiClient,
-            OrderService orderService,
-            IPaymentService paymentService) =>
+            OrderService orderService) =>
         {
             var userName = user.FindFirstValue(JwtRegisteredClaimNames.UniqueName) ?? user.Identity?.Name;
             if (string.IsNullOrEmpty(userName))
@@ -33,67 +31,15 @@ public static class OrderEndpoints
             var order = orderService.CreateFromCart(cart);
             await orderService.SaveChangesAsync();
 
-            CheckoutSession session;
-            try
-            {
-                session = await paymentService.CreateCheckoutSessionAsync(order);
-            }
-            catch (StripeException ex)
-            {
-                return Results.Problem($"Failed to start checkout with Stripe: {ex.Message}");
-            }
-
-            order.StripeSessionId = session.SessionId;
-            await orderService.SaveChangesAsync();
-
-            return Results.Ok(new { orderId = order.Id, checkoutUrl = session.CheckoutUrl });
+            return Results.Ok(new { orderId = order.Id });
         })
         .WithName("Checkout")
         .RequireAuthorization("UserOnly");
 
-        // Called by Stripe (not the browser) when a Checkout Session's payment completes.
-        group.MapPost("/webhook", async (
-            HttpRequest request,
-            OrderService orderService,
-            StripePaymentService stripePaymentService) =>
+        // The mock payment page's "Pay" button. There is no real payment provider in this
+        // project, so paying just marks the order Paid (no real money moves).
+        group.MapPost("/{id:int}/mock-pay", async (int id, ClaimsPrincipal user, OrderService orderService) =>
         {
-            using var reader = new StreamReader(request.Body);
-            var json = await reader.ReadToEndAsync();
-
-            Event stripeEvent;
-            try
-            {
-                stripeEvent = stripePaymentService.ConstructWebhookEvent(json, request.Headers["Stripe-Signature"]!);
-            }
-            catch (StripeException)
-            {
-                return Results.BadRequest("Invalid Stripe signature.");
-            }
-
-            if (stripeEvent.Type == EventTypes.CheckoutSessionCompleted &&
-                stripeEvent.Data.Object is Stripe.Checkout.Session session)
-            {
-                var order = await orderService.GetByStripeSessionIdAsync(session.Id);
-                if (order is not null)
-                {
-                    await orderService.MarkPaidAsync(order);
-                }
-            }
-
-            return Results.Ok();
-        })
-        .WithName("StripeWebhook")
-        .AllowAnonymous();
-
-        // The mock provider's "Pay" button. Only exists when Payment:Provider is Mock —
-        // otherwise anyone could mark their own order paid without paying.
-        group.MapPost("/{id:int}/mock-pay", async (int id, ClaimsPrincipal user, OrderService orderService, IPaymentService paymentService) =>
-        {
-            if (paymentService is not MockPaymentService)
-            {
-                return Results.NotFound();
-            }
-
             var order = await orderService.GetByIdAsync(id);
             if (order is null)
             {
@@ -139,6 +85,20 @@ public static class OrderEndpoints
             return Results.Ok(order);
         })
         .WithName("CancelOrder")
+        .RequireAuthorization("UserOnly");
+
+        // GET the caller's own orders (order history page).
+        group.MapGet("/", async (ClaimsPrincipal user, OrderService orderService) =>
+        {
+            var userName = user.FindFirstValue(JwtRegisteredClaimNames.UniqueName) ?? user.Identity?.Name;
+            if (string.IsNullOrEmpty(userName))
+            {
+                return Results.Unauthorized();
+            }
+
+            return Results.Ok(await orderService.GetByUserAsync(userName));
+        })
+        .WithName("GetMyOrders")
         .RequireAuthorization("UserOnly");
 
         // GET order details, used by the order-confirmation page.

@@ -27,10 +27,16 @@ public class OrderService(OrderDbContext dbContext, ServiceBusClient serviceBusC
     public Task<Order?> GetByIdAsync(int id) =>
         dbContext.Orders.Include(o => o.Items).FirstOrDefaultAsync(o => o.Id == id);
 
-    public Task<Order?> GetByStripeSessionIdAsync(string sessionId) =>
-        dbContext.Orders.Include(o => o.Items).FirstOrDefaultAsync(o => o.StripeSessionId == sessionId);
+    // Order history for one customer, newest first.
+    public async Task<List<Order>> GetByUserAsync(string userName) =>
+        await dbContext.Orders
+            .AsNoTracking()
+            .Include(o => o.Items)
+            .Where(o => o.UserName.ToLower() == userName.ToLower())
+            .OrderByDescending(o => o.CreatedAtUtc)
+            .ToListAsync();
 
-    // Shared by the Stripe webhook and the mock "Pay" button. Safe to call twice.
+    // Called by the mock "Pay" button. Safe to call twice.
     public async Task MarkPaidAsync(Order order)
     {
         if (order.Status == OrderStatus.Paid)

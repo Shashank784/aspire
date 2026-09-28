@@ -24,17 +24,20 @@ export function Layout() {
             <NavLink to="/" end>
               Shop
             </NavLink>
-            {user.isAuthenticated && <NavLink to="/basket">Basket</NavLink>}
+            {user.isAuthenticated && !isAdmin && <NavLink to="/basket">Basket</NavLink>}
+            {user.isAuthenticated && !isAdmin && <NavLink to="/orders">My orders</NavLink>}
             {isAdmin && <NavLink to="/admin/products">Admin</NavLink>}
           </nav>
 
           <div className="header-actions">
             {user.isAuthenticated ? (
               <>
-                <Link to="/basket" className="basket-button" aria-label={`Basket, ${itemCount} items`}>
-                  <BasketIcon />
-                  {itemCount > 0 && <span className="badge">{itemCount}</span>}
-                </Link>
+                {!isAdmin && (
+                  <Link to="/basket" className="basket-button" aria-label={`Basket, ${itemCount} items`}>
+                    <BasketIcon />
+                    {itemCount > 0 && <span className="badge">{itemCount}</span>}
+                  </Link>
+                )}
                 <span className="user-name" title={user.name ?? ''}>
                   {user.name}
                 </span>

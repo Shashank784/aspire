@@ -109,16 +109,24 @@ public class ProductService(ProductDbContext dbContext, ServiceBusClient service
         await imageStorage.DeleteIfUploadedAsync(oldImageUrl);
     }
 
+    // Case-insensitive: "tent", "Tent" and "TENT" all match. Contains() becomes a
+    // case-sensitive LIKE in Postgres, so use ILIKE instead.
     public async Task<IEnumerable<Product>> SearchProductsAsync(string query)
     {
+        var term = query.Trim();
+
+        // Escape LIKE wildcards so "%" or "_" typed by the user are matched literally.
+        var pattern = "%" + term.Replace(@"\", @"\\").Replace("%", @"\%").Replace("_", @"\_") + "%";
+
         return await cache.GetOrCreateAsync(
-            $"catalog:search:{query}",
+            $"catalog:search:{term.ToLowerInvariant()}", // same cache entry whatever the case
             async cancellationToken =>
             {
-                logger.LogInformation("Cache miss: searching the database for {Query}", query);
+                logger.LogInformation("Cache miss: searching the database for {Query}", term);
                 return await dbContext.Products
                     .AsNoTracking()
-                    .Where(p => p.Name.Contains(query))
+                    .Where(p => EF.Functions.ILike(p.Name, pattern, @"\"))
+                    .OrderBy(p => p.Id)
                     .ToListAsync(cancellationToken);
             },
             SearchEntryOptions,

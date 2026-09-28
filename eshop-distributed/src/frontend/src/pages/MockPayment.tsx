@@ -4,7 +4,7 @@ import { ordersApi, type Order } from '../api'
 import { Spinner } from '../components/Spinner'
 import { formatPrice } from '../format'
 
-// Stand-in for Stripe's hosted payment page, used when Orders runs with Payment:Provider = Mock.
+// Demo payment page. There is no real payment provider: "Pay" just marks the order Paid.
 export function MockPayment() {
   const [searchParams] = useSearchParams()
   const orderId = Number(searchParams.get('orderId'))

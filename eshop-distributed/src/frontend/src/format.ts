@@ -1,6 +1,6 @@
 import type { Product } from './api'
 
-// Stripe charges in INR, so show INR everywhere.
+// Prices are in INR everywhere.
 const inr = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' })
 
 export const formatPrice = (value: number) => inr.format(value)

@@ -1,15 +1,21 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { ordersApi } from '../api'
 import { useBasket } from '../basket'
 import { Spinner } from '../components/Spinner'
 import { formatPrice } from '../format'
 
 export function BasketPage() {
-  const { basket, changeQuantity, remove } = useBasket()
+  const { basket, refresh, changeQuantity, remove } = useBasket()
+  const navigate = useNavigate()
   const [busyProductId, setBusyProductId] = useState<number | null>(null)
   const [checkingOut, setCheckingOut] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Load the latest basket each time the page opens (the server may have changed it).
+  useEffect(() => {
+    refresh().catch(() => {})
+  }, [refresh])
 
   if (!basket) {
     return <Spinner label="Loading basket..." />
@@ -33,8 +39,8 @@ export function BasketPage() {
     setCheckingOut(true)
     setError(null)
     try {
-      const { checkoutUrl } = await ordersApi.checkout()
-      window.location.href = checkoutUrl // Stripe's hosted payment page
+      const { orderId } = await ordersApi.checkout()
+      navigate(`/mock-payment?orderId=${orderId}`)
     } catch (e) {
       setError(e instanceof Error ? `Failed to start checkout: ${e.message}` : 'Failed to start checkout.')
       setCheckingOut(false)

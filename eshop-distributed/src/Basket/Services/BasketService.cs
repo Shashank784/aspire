@@ -1,10 +1,14 @@
 ﻿using Microsoft.Extensions.Caching.Distributed;
+using StackExchange.Redis;
 using System.Text.Json;
 
 namespace Basket.Services;
 
-public class BasketService(IDistributedCache cache, CatalogApiClient catalogApiClient)
+public class BasketService(IDistributedCache cache, IConnectionMultiplexer redis, CatalogApiClient catalogApiClient)
 {
+    // IDistributedCache can't list its keys, so keep a Redis set of every user who has a basket.
+    private const string BasketUsersKey = "basket:users";
+
     public async Task<ShoppingCart?> GetBasket(string userName)
     {
         var basket = await cache.GetStringAsync(userName);
@@ -23,23 +27,39 @@ public class BasketService(IDistributedCache cache, CatalogApiClient catalogApiC
         }
 
         await cache.SetStringAsync(basket.UserName, JsonSerializer.Serialize(basket));
+        await redis.GetDatabase().SetAddAsync(BasketUsersKey, basket.UserName);
     }
     public async Task DeleteBasket(string userName)
     {
         await cache.RemoveAsync(userName);
+        await redis.GetDatabase().SetRemoveAsync(BasketUsersKey, userName);
     }
 
+    // Called when a product's price changes: update that product in every basket that holds it.
     internal async Task UpdateBasketItemProductPrices(int productId, decimal price)
     {
-        // IDistributedCache not supported list of keys function
-        // https://github.com/dotnet/runtime/issues/36402
+        var db = redis.GetDatabase();
 
-        var basket = await GetBasket("swn");
-
-        var item = basket!.Items.FirstOrDefault(x => x.ProductId == productId);
-        if (item != null)
+        foreach (var member in await db.SetMembersAsync(BasketUsersKey))
         {
-            item.Price = price;
+            var userName = member.ToString();
+            var basket = await GetBasket(userName);
+            if (basket is null)
+            {
+                await db.SetRemoveAsync(BasketUsersKey, userName); // basket is gone, stop tracking it
+                continue;
+            }
+
+            var items = basket.Items.Where(x => x.ProductId == productId).ToList();
+            if (items.Count == 0)
+            {
+                continue;
+            }
+
+            foreach (var item in items)
+            {
+                item.Price = price;
+            }
             await cache.SetStringAsync(basket.UserName, JsonSerializer.Serialize(basket));
         }
     }

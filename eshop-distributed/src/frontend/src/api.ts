@@ -142,10 +142,12 @@ export const basketApi = {
     }
   },
   save: (basket: Basket) => request<Basket>('POST', '/api/basket', { userName: basket.userName, items: basket.items }),
+  remove: (userName: string) => request<void>('DELETE', `/api/basket/${encodeURIComponent(userName)}`),
 }
 
 export const ordersApi = {
-  checkout: () => request<{ orderId: number; checkoutUrl: string }>('POST', '/api/orders/checkout'),
+  list: () => request<Order[]>('GET', '/api/orders'),
+  checkout: () => request<{ orderId: number }>('POST', '/api/orders/checkout'),
   get: (id: number) => request<Order>('GET', `/api/orders/${id}`),
   mockPay: (id: number) => request<Order>('POST', `/api/orders/${id}/mock-pay`),
   cancel: (id: number) => request<Order>('POST', `/api/orders/${id}/cancel`),

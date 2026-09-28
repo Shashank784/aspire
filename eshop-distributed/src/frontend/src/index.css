@@ -13,6 +13,8 @@
   --danger-soft: #fbeae8;
   --success: #1f7a4d;
   --success-soft: #e3f4ea;
+  --warning: #8a5a00;
+  --warning-soft: #fff4d6;
   --shadow: 0 1px 2px rgb(16 24 40 / 6%), 0 4px 16px rgb(16 24 40 / 6%);
   --radius: 14px;
   --radius-sm: 9px;
@@ -41,6 +43,8 @@
     --danger-soft: #3a1d1a;
     --success: #5bbd8a;
     --success-soft: #1c2e25;
+    --warning: #e8b54a;
+    --warning-soft: #33280f;
     --shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 4px 16px rgb(0 0 0 / 30%);
   }
 }
@@ -382,6 +386,57 @@ img {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+/* ---------- Order history ---------- */
+
+.order-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.order-card {
+  padding: 20px 24px;
+}
+
+.order-card .table {
+  margin: 12px 0 16px;
+}
+
+.order-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.order-head h2 {
+  margin: 0 0 2px;
+  font-size: 1.1rem;
+}
+
+.status {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.status-paid {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.status-pending {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.status-cancelled {
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
 /* ---------- Spinner ---------- */
@@ -848,7 +903,17 @@ input[type='file'] {
 
   .details-body,
   .auth-card,
-  .confirmation {
+  .confirmation,
+  .order-card {
     padding: 20px;
+  }
+
+  .order-card .table {
+    font-size: 0.85rem;
+  }
+
+  .order-card .table th,
+  .order-card .table td {
+    padding: 8px 4px;
   }
 }

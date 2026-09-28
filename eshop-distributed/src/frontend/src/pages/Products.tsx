@@ -10,6 +10,11 @@ export function Products() {
   const [searchParams, setSearchParams] = useSearchParams()
   const query = searchParams.get('q') ?? ''
   const [input, setInput] = useState(query)
+
+  // Keep the box in step with the URL (e.g. browser Back after a search).
+  useEffect(() => {
+    setInput(query)
+  }, [query])
   const [products, setProducts] = useState<Product[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -43,7 +48,13 @@ export function Products() {
           <input
             type="search"
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => {
+              setInput(e.target.value)
+              // Box emptied (backspace or the × button): show all products again.
+              if (e.target.value.trim() === '' && query) {
+                setSearchParams({})
+              }
+            }}
             placeholder="Search products..."
             aria-label="Search products"
           />

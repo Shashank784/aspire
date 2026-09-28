@@ -3,7 +3,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.AddServiceDefaults();
-builder.AddRedisDistributedCache(connectionName: "cache");
+// Registers both IConnectionMultiplexer (used to track which users have a basket) and IDistributedCache.
+builder.AddRedisClientBuilder(connectionName: "cache").WithDistributedCache();
 builder.Services.AddScoped<BasketService>();
 
 builder.Services.AddHttpClient<CatalogApiClient>(client =>

@@ -9,7 +9,7 @@ interface BasketContextValue {
   add: (product: Product) => Promise<void>
   changeQuantity: (productId: number, delta: number) => Promise<void>
   remove: (productId: number) => Promise<void>
-  clear: () => void
+  clear: () => Promise<void>
 }
 
 const BasketContext = createContext<BasketContextValue | null>(null)
@@ -17,8 +17,9 @@ const BasketContext = createContext<BasketContextValue | null>(null)
 // Same flow as the old BasketActions: read the basket, change it, save it back.
 // Basket service re-fetches price/name from Catalog on every save.
 export function BasketProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth()
-  const userName = user.isAuthenticated ? user.name : null
+  const { user, isAdmin } = useAuth()
+  // Admins don't shop, so they have no basket.
+  const userName = user.isAuthenticated && !isAdmin ? user.name : null
   const [basket, setBasket] = useState<Basket | null>(null)
 
   const refresh = useCallback(async () => {
@@ -77,7 +78,12 @@ export function BasketProvider({ children }: { children: ReactNode }) {
     [update],
   )
 
-  const clear = useCallback(() => setBasket(userName ? { userName, items: [] } : null), [userName])
+  // Empties the basket on the server and in the UI. Safe to call twice.
+  const clear = useCallback(async () => {
+    if (!userName) return
+    setBasket({ userName, items: [] })
+    await basketApi.remove(userName)
+  }, [userName])
 
   const value = useMemo(
     () => ({

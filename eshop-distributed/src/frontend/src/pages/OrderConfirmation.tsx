@@ -5,48 +5,34 @@ import { useBasket } from '../basket'
 import { Spinner } from '../components/Spinner'
 import { formatDate, formatPrice } from '../format'
 
-const POLL_INTERVAL_MS = 2000
-const MAX_POLLS = 15
-
-// The payment provider's webhook marks the order Paid a moment after the redirect,
-// so poll for a short while instead of asking the user to refresh.
+// The mock payment page marks the order Paid before it sends the customer here.
 export function OrderConfirmation() {
   const [searchParams] = useSearchParams()
   const orderId = Number(searchParams.get('orderId'))
-  const { refresh: refreshBasket } = useBasket()
+  const { clear: clearBasket } = useBasket()
   const [order, setOrder] = useState<Order | null>(null)
   const [notFound, setNotFound] = useState(false)
-  const [gaveUp, setGaveUp] = useState(false)
 
   useEffect(() => {
-    let polls = 0
-    let timer: number | undefined
     let cancelled = false
 
-    const load = async () => {
-      try {
-        const result = await ordersApi.get(orderId)
+    ordersApi
+      .get(orderId)
+      .then((result) => {
         if (cancelled) return
         setOrder(result)
-
         if (result.status === 'Paid') {
-          refreshBasket().catch(() => {}) // the basket is cleared once payment completes
-        } else if (++polls < MAX_POLLS) {
-          timer = window.setTimeout(load, POLL_INTERVAL_MS)
-        } else {
-          setGaveUp(true)
+          // Basket's OrderPaid listener also clears it, but that runs a moment later —
+          // clear it here too so the header and basket page are empty right away.
+          clearBasket().catch(() => {})
         }
-      } catch {
-        if (!cancelled) setNotFound(true)
-      }
-    }
+      })
+      .catch(() => !cancelled && setNotFound(true))
 
-    load()
     return () => {
       cancelled = true
-      window.clearTimeout(timer)
     }
-  }, [orderId, refreshBasket])
+  }, [orderId, clearBasket])
 
   if (notFound) {
     return (
@@ -66,14 +52,12 @@ export function OrderConfirmation() {
   if (order.status !== 'Paid') {
     return (
       <div className="empty-state card">
-        <h1>Payment processing...</h1>
-        {gaveUp ? (
-          <p>We still haven't heard back from the payment provider. Please refresh this page in a little while.</p>
-        ) : (
-          <>
-            <Spinner label="Waiting for payment confirmation" />
-            <p className="muted">This usually takes just a few seconds.</p>
-          </>
+        <h1>This order is not paid</h1>
+        <p>Order #{order.id} is {order.status.toLowerCase()}.</p>
+        {order.status === 'Pending' && (
+          <Link to={`/mock-payment?orderId=${order.id}`} className="btn btn-primary">
+            Go to payment
+          </Link>
         )}
       </div>
     )
@@ -120,6 +104,9 @@ export function OrderConfirmation() {
         <a className="btn btn-primary" href={ordersApi.invoiceUrl(order.id)}>
           Download invoice
         </a>
+        <Link className="btn btn-ghost" to="/orders">
+          My orders
+        </Link>
         <Link className="btn btn-ghost" to="/">
           Continue shopping
         </Link>

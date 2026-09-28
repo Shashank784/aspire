@@ -13,27 +13,6 @@ builder.Services.AddScoped<OrderService>();
 builder.Services.AddScoped<InvoiceService>();
 builder.AddAzureServiceBusClient("servicebus");
 
-
-// "Mock" (default) needs no keys; "Stripe" needs Stripe:SecretKey and Stripe:WebhookSecret.
-// StripePaymentService is always registered because the webhook endpoint uses it.
-builder.Services.AddSingleton<StripePaymentService>();
-var paymentProvider = builder.Configuration["Payment:Provider"] ?? "Mock";
-if (paymentProvider.Equals("Stripe", StringComparison.OrdinalIgnoreCase))
-{
-    var stripeSecretKey = builder.Configuration["Stripe:SecretKey"];
-    if (string.IsNullOrEmpty(stripeSecretKey))
-    {
-        throw new InvalidOperationException("Payment:Provider is Stripe but Stripe:SecretKey is not configured.");
-    }
-
-    Stripe.StripeConfiguration.ApiKey = stripeSecretKey;
-    builder.Services.AddSingleton<IPaymentService>(sp => sp.GetRequiredService<StripePaymentService>());
-}
-else
-{
-    builder.Services.AddSingleton<IPaymentService, MockPaymentService>();
-}
-
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddTransient<ForwardedBearerHandler>();
 
