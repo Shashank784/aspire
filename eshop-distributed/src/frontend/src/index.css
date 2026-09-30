@@ -388,6 +388,36 @@ img {
   flex-wrap: wrap;
 }
 
+/* ---------- Pagination ---------- */
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin-top: 28px;
+}
+
+.pagination-pages {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pagination-pages .btn {
+  min-width: 36px;
+}
+
+.pagination-gap {
+  padding: 0 4px;
+  color: var(--muted);
+}
+
+.pagination-summary {
+  text-align: center;
+  margin-top: 10px;
+}
+
 /* ---------- Order history ---------- */
 
 .order-list {
@@ -899,6 +929,16 @@ input[type='file'] {
 
   .basket-row {
     grid-template-columns: 1fr auto;
+  }
+
+  .pagination {
+    flex-wrap: wrap;
+  }
+
+  .pagination-pages {
+    order: -1;
+    width: 100%;
+    justify-content: center;
   }
 
   .details-body,

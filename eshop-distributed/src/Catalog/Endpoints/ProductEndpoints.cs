@@ -15,6 +15,17 @@ public static class ProductEndpoints
         .WithName("GetAllProducts")
         .Produces<List<Product>>(StatusCodes.Status200OK);
 
+        // GET one page for the shop: /products/paged?page=1&pageSize=12&q=tent (q is optional)
+        group.MapGet("/paged", async (ProductService service, int page = 1, int pageSize = 12, string? q = null) =>
+        {
+            page = Math.Max(1, page);
+            pageSize = Math.Clamp(pageSize, 1, ProductService.MaxPageSize);
+
+            return Results.Ok(await service.GetProductsPageAsync(page, pageSize, q));
+        })
+        .WithName("GetProductsPage")
+        .Produces<PagedResult<Product>>(StatusCodes.Status200OK);
+
         // GET by ID
         group.MapGet("/{id}", async (int id, ProductService service) =>
         {

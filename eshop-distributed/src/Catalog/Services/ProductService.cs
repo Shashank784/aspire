@@ -31,6 +31,40 @@ public class ProductService(ProductDbContext dbContext, ServiceBusClient service
             tags: Tags);
     }
 
+    public const int MaxPageSize = 50;
+
+    // One page of products for the shop page, optionally filtered by a case-insensitive name
+    // search. Each page is cached on its own and cleared with the rest on any product change.
+    public async Task<PagedResult<Product>> GetProductsPageAsync(int page, int pageSize, string? query)
+    {
+        var term = query?.Trim() ?? "";
+
+        return await cache.GetOrCreateAsync(
+            $"catalog:products:page:{page}:{pageSize}:{term.ToLowerInvariant()}",
+            async cancellationToken =>
+            {
+                logger.LogInformation("Cache miss: loading page {Page} of products (search: {Query})", page, term);
+
+                var products = dbContext.Products.AsNoTracking();
+                if (term.Length > 0)
+                {
+                    var pattern = LikePattern(term);
+                    products = products.Where(p => EF.Functions.ILike(p.Name, pattern, @"\"));
+                }
+
+                var totalCount = await products.CountAsync(cancellationToken);
+                var items = await products
+                    .OrderBy(p => p.Id)
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToListAsync(cancellationToken);
+
+                return new PagedResult<Product>(items, page, pageSize, totalCount);
+            },
+            term.Length > 0 ? SearchEntryOptions : null,
+            tags: Tags);
+    }
+
     public async Task<Product?> GetProductByIdAsync(int id)
     {
         return await cache.GetOrCreateAsync(
@@ -114,9 +148,7 @@ public class ProductService(ProductDbContext dbContext, ServiceBusClient service
     public async Task<IEnumerable<Product>> SearchProductsAsync(string query)
     {
         var term = query.Trim();
-
-        // Escape LIKE wildcards so "%" or "_" typed by the user are matched literally.
-        var pattern = "%" + term.Replace(@"\", @"\\").Replace("%", @"\%").Replace("_", @"\_") + "%";
+        var pattern = LikePattern(term);
 
         return await cache.GetOrCreateAsync(
             $"catalog:search:{term.ToLowerInvariant()}", // same cache entry whatever the case
@@ -132,4 +164,8 @@ public class ProductService(ProductDbContext dbContext, ServiceBusClient service
             SearchEntryOptions,
             tags: Tags);
     }
+
+    // "%term%" for ILIKE, with LIKE wildcards escaped so "%" or "_" typed by the user are matched literally.
+    private static string LikePattern(string term) =>
+        "%" + term.Replace(@"\", @"\\").Replace("%", @"\%").Replace("_", @"\_") + "%";
 }

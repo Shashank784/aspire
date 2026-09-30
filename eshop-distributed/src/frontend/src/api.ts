@@ -31,6 +31,14 @@ export interface OrderItem {
   quantity: number
 }
 
+export interface PagedResult<T> {
+  items: T[]
+  page: number
+  pageSize: number
+  totalCount: number
+  totalPages: number
+}
+
 export type OrderStatus = 'Pending' | 'Paid' | 'Cancelled'
 
 export interface Order {
@@ -118,7 +126,12 @@ type ProductInput = Omit<Product, 'id'>
 export const catalogApi = {
   list: () => request<Product[]>('GET', '/api/products'),
   get: (id: number) => request<Product>('GET', `/api/products/${id}`),
-  search: (query: string) => request<Product[]>('GET', `/api/products/search/${encodeURIComponent(query)}`),
+  // One page of the shop, optionally filtered by a (case-insensitive) name search.
+  page: (page: number, pageSize: number, query?: string) => {
+    const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
+    if (query) params.set('q', query)
+    return request<PagedResult<Product>>('GET', `/api/products/paged?${params}`)
+  },
   create: (product: ProductInput) => request<Product>('POST', '/api/products', product),
   update: (id: number, product: ProductInput) => request<void>('PUT', `/api/products/${id}`, product),
   remove: (id: number) => request<void>('DELETE', `/api/products/${id}`),
