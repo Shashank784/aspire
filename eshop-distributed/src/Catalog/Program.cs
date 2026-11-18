@@ -26,6 +26,20 @@ builder.AddAzureServiceBusClient("servicebus");
 
 builder.AddJwtValidation();
 
+// GenAI: IChatClient (Microsoft.Extensions.AI) backed by the Ollama "chat" model from the AppHost.
+// Our code only talks to IChatClient, so Ollama can later be swapped for OpenAI / Azure OpenAI.
+builder.AddOllamaApiClient("chat").AddChatClient();
+builder.Services.AddScoped<ProductAIService>();
+
+// A local LLM on CPU can take longer than the default 10-second resilience timeout, and retrying
+// a slow answer only makes it slower. So the Ollama HttpClient gets a long timeout and no retries.
+// ("chat_httpClient" is the name CommunityToolkit.Aspire.OllamaSharp gives the client for "chat".)
+#pragma warning disable EXTEXP0001 // RemoveAllResilienceHandlers is marked experimental
+builder.Services
+    .AddHttpClient("chat_httpClient", client => client.Timeout = TimeSpan.FromMinutes(3))
+    .RemoveAllResilienceHandlers();
+#pragma warning restore EXTEXP0001
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -34,6 +48,7 @@ app.MapDefaultEndpoints();
 app.UseMigration();
 
 app.MapProductEndpoints();
+app.MapProductAIEndpoints();
 
 app.UseAuthentication();
 

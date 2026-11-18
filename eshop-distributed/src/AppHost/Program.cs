@@ -2,21 +2,27 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
 // Backing Services
+// Locally these run as containers; on deploy they become Azure Database for PostgreSQL
+// and Azure Managed Redis. Password / access-key auth keeps the plain Npgsql and
+// StackExchange.Redis clients working without Entra ID token code.
 var postgres = builder
-        .AddPostgres("postgres")
+    .AddAzurePostgresFlexibleServer("postgres")
+    .WithPasswordAuthentication()
+    .RunAsContainer(container => container
         .WithPgAdmin()
-        //.WithDataVolume()
-        .WithLifetime(ContainerLifetime.Persistent);
+        .WithDataVolume()
+        .WithLifetime(ContainerLifetime.Persistent));
 
 var catalogDb = postgres.AddDatabase("catalogdb");
 var identityDb = postgres.AddDatabase("identitydb");
 var ordersDb = postgres.AddDatabase("ordersdb");
 
 var cache = builder
-    .AddRedis("cache")
-    .WithRedisInsight()
-    //.WithDataVolume()
-    .WithLifetime(ContainerLifetime.Persistent);
+    .AddAzureManagedRedis("cache")
+    .WithAccessKeyAuthentication()
+    .RunAsContainer(container => container
+        .WithRedisInsight()
+        .WithLifetime(ContainerLifetime.Persistent));
 
 // Azure Service Bus (local emulator) carries all integration events. The emulator can't
 // create entities at runtime, so the topics and their subscriptions are declared here.
@@ -45,24 +51,38 @@ var productImages = storage.AddBlobContainer("product-images");
 var sendGridApiKey = builder.AddParameter("sendgrid-api-key", secret: true);
 var sendGridFromEmail = builder.AddParameter("sendgrid-from-email");
 
-if (builder.ExecutionContext.IsRunMode)
-{
-    // Data volumes don't work on ACA for Postgres so only add when running
-    postgres.WithDataVolume();
-}
+// Key that Identity signs JWTs with and the APIs validate them with. Overrides Jwt:SigningKey
+// from appsettings; the real value lives in user secrets locally and as a secret in Azure.
+var jwtSigningKey = builder.AddParameter("jwt-signing-key", secret: true);
+
+// GenAI backing service: Ollama runs a local LLM in a container, just like Postgres or Redis.
+// The model is downloaded automatically on the first run (~2 GB) and kept in the data volume.
+// "chat" is the connection name the Catalog service uses to get an IChatClient.
+// llama3.2 (3b) follows the "only use our products" rules much better than llama3.2:1b.
+var ollama = builder
+    .AddOllama("ollama")
+    .WithDataVolume()
+    .WithLifetime(ContainerLifetime.Persistent);
+
+var chatModel = ollama.AddModel("chat", "llama3.2");
 
 // Projects
 var identity = builder
     .AddProject<Projects.Identity>("identity")
+    .WithEnvironment("Jwt__SigningKey", jwtSigningKey)
     .WithReference(identityDb)
     .WaitFor(identityDb);
 
 var catalog = builder
     .AddProject<Projects.Catalog>("catalog")
+    .WithEnvironment("Jwt__SigningKey", jwtSigningKey)
     .WithReference(catalogDb)
     .WithReference(cache)
     .WithReference(serviceBus)
     .WithReference(productImages)
+    // No WaitFor here: the model download can take minutes on the first run, and the rest of
+    // the shop should not wait for it. Only the AI endpoints need the model.
+    .WithReference(chatModel)
     .WaitFor(catalogDb)
     .WaitFor(productImages)
     .WaitFor(cache)
@@ -70,6 +90,7 @@ var catalog = builder
 
 var basket = builder
     .AddProject<Projects.Basket>("basket")
+    .WithEnvironment("Jwt__SigningKey", jwtSigningKey)
     .WithReference(cache)
     .WithReference(catalog)
     .WithReference(serviceBus)
@@ -78,6 +99,7 @@ var basket = builder
 
 var orders = builder
     .AddProject<Projects.Orders>("orders")
+    .WithEnvironment("Jwt__SigningKey", jwtSigningKey)
     .WithReference(ordersDb)
     .WithReference(basket)
     .WithReference(serviceBus)
@@ -93,8 +115,11 @@ var notification = builder
     .WithEnvironment("SendGrid__ApiKey", sendGridApiKey)
     .WithEnvironment("SendGrid__FromEmail", sendGridFromEmail);
 
-// React frontend: the Vite dev server proxies /api and /bff to the BFF, which holds the
-// login cookie and forwards API calls to the services with the user's JWT attached.
+// React frontend: locally the Vite dev server proxies /api and /bff to the BFF, which holds
+// the login cookie and forwards API calls to the services with the user's JWT attached.
+// On deploy the built app is copied into the BFF's wwwroot, so the BFF is the public site.
+var frontend = builder.AddViteApp("frontend", "../frontend");
+
 var bff = builder
     .AddProject<Projects.Bff>("bff")
     .WithReference(identity)
@@ -104,10 +129,20 @@ var bff = builder
     .WaitFor(identity)
     .WaitFor(catalog)
     .WaitFor(basket)
-    .WaitFor(orders);
+    .WaitFor(orders)
+    .PublishWithContainerFiles(frontend, "./wwwroot");
 
-builder
-    .AddViteApp("frontend", "../frontend")
+if (builder.ExecutionContext.IsPublishMode)
+{
+    bff.WithExternalHttpEndpoints();
+
+    // azd can't resolve CACHE_URI (a Key Vault secret and an output in one value), so drop it.
+    // The services only read ConnectionStrings__cache.
+    catalog.WithEnvironment(ctx => ctx.EnvironmentVariables.Remove("CACHE_URI"));
+    basket.WithEnvironment(ctx => ctx.EnvironmentVariables.Remove("CACHE_URI"));
+}
+
+frontend
     .WithReference(bff)
     .WaitFor(bff)
     .WithExternalHttpEndpoints();

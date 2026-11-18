@@ -24,6 +24,7 @@ export function Layout() {
             <NavLink to="/" end>
               Shop
             </NavLink>
+            <NavLink to="/support">Ask AI</NavLink>
             {user.isAuthenticated && !isAdmin && <NavLink to="/basket">Basket</NavLink>}
             {user.isAuthenticated && !isAdmin && <NavLink to="/orders">My orders</NavLink>}
             {isAdmin && <NavLink to="/admin/products">Admin</NavLink>}

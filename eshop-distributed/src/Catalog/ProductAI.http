@@ -1,0 +1,51 @@
+### AI support assistant — demo requests
+### Run the AppHost first. Open this file in VS Code (REST Client extension) or Visual Studio
+### and click "Send Request" above each request.
+
+@Catalog = https://localhost:7234
+@Bff = https://localhost:7176
+
+### 1. Simple Q&A (GET) straight to Catalog
+GET {{Catalog}}/products/ai/support?question=What can I use to cook food while camping?
+Accept: application/json
+
+### 2. Budget question — the answer should use real names and prices
+GET {{Catalog}}/products/ai/support?question=I have 50 dollars. What can I buy for a night in the forest?
+Accept: application/json
+
+### 3. Grounding test — we do not sell this, so the assistant should say it doesn't know
+GET {{Catalog}}/products/ai/support?question=Do you sell mountain bikes?
+Accept: application/json
+
+### 4. Off-topic test — the assistant should politely refuse
+GET {{Catalog}}/products/ai/support?question=Who won the cricket world cup?
+Accept: application/json
+
+### 5. Chat with history (POST) — follow-up question "is it waterproof?" refers to the jacket
+POST {{Catalog}}/products/ai/chat
+Content-Type: application/json
+
+{
+  "question": "Is it good for rain?",
+  "history": [
+    { "role": "user", "content": "I need something to wear on a hike." },
+    { "role": "assistant", "content": "The Outdoor Rain Jacket ($49.99) will keep you warm and dry in all weathers." }
+  ]
+}
+
+### 6. Same Q&A through the BFF (the way the React frontend calls it)
+GET {{Bff}}/api/products/ai/support?question=Which product helps me see at night?
+Accept: application/json
+
+### 7. Chat through the BFF — POST needs the X-CSRF header
+POST {{Bff}}/api/products/ai/chat
+Content-Type: application/json
+X-CSRF: 1
+
+{
+  "question": "Suggest a full camping kit under 200 dollars."
+}
+
+### 8. Validation — empty question returns 400
+GET {{Catalog}}/products/ai/support?question=
+Accept: application/json

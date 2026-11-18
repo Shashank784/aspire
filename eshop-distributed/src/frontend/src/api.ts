@@ -142,6 +142,22 @@ export const catalogApi = {
   },
 }
 
+// AI support assistant (Catalog → Ollama LLM). Open to everyone, no login needed.
+export interface ChatTurn {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+export interface SupportResponse {
+  answer: string
+  durationMs: number
+}
+
+export const supportApi = {
+  chat: (question: string, history: ChatTurn[]) =>
+    request<SupportResponse>('POST', '/api/products/ai/chat', { question, history }),
+}
+
 export const basketApi = {
   // Basket answers 404 when the user has no basket yet — treat that as empty.
   get: async (userName: string): Promise<Basket> => {
