@@ -1,0 +1,98 @@
+api-version: 2024-02-02-preview
+location: {{ .Env.AZURE_LOCATION }}
+identity:
+  type: UserAssigned
+  userAssignedIdentities:
+    ? "{{ .Env.AZURE_CONTAINER_REGISTRY_MANAGED_IDENTITY_ID }}"
+    : {}
+properties:
+  environmentId: {{ .Env.AZURE_CONTAINER_APPS_ENVIRONMENT_ID }}
+  configuration:
+    activeRevisionsMode: single
+    runtime:
+      dotnet:
+        autoConfigureDataProtection: true
+    ingress:
+      external: false
+      targetPort: {{ targetPortOrDefault 8080 }}
+      transport: http
+      allowInsecure: true
+    registries:
+      - server: {{ .Env.AZURE_CONTAINER_REGISTRY_ENDPOINT }}
+        identity: {{ .Env.AZURE_CONTAINER_REGISTRY_MANAGED_IDENTITY_ID }}
+    secrets:
+      - name: catalogdb-password
+        value: '{{ securedParameter "postgres_password" }}'
+      - name: catalogdb-uri
+        value: postgresql://{{ parameter "postgres_username" }}:{{ securedParameter "postgres_password" }}@{{ .Env.POSTGRES_HOSTNAME }}/catalogdb
+      - name: connectionstrings--product-images
+        value: Endpoint={{ .Env.STORAGE_BLOBENDPOINT }};ContainerName=product-images
+      - name: connectionstrings--servicebus
+        value: '{{ .Env.SERVICEBUS_SERVICEBUSENDPOINT }}'
+      - name: jwt--signingkey
+        value: '{{ securedParameter "jwt_signing_key" }}'
+      - name: cache-password
+        keyVaultUrl: '{{ .Env.CACHE_KV_VAULTURI }}secrets/primaryaccesskey--cache'
+        identity: {{ .Env.AZURE_CONTAINER_REGISTRY_MANAGED_IDENTITY_ID }}
+      - name: connectionstrings--cache
+        keyVaultUrl: '{{ .Env.CACHE_KV_VAULTURI }}secrets/connectionstrings--cache'
+        identity: {{ .Env.AZURE_CONTAINER_REGISTRY_MANAGED_IDENTITY_ID }}
+      - name: connectionstrings--catalogdb
+        keyVaultUrl: '{{ .Env.POSTGRES_KV_VAULTURI }}secrets/connectionstrings--catalogdb'
+        identity: {{ .Env.AZURE_CONTAINER_REGISTRY_MANAGED_IDENTITY_ID }}
+  template:
+    containers:
+      - image: {{ .Image }}
+        name: catalog
+        env:
+          - name: AZURE_CLIENT_ID
+            value: {{ .Env.MANAGED_IDENTITY_CLIENT_ID }}
+          - name: ASPNETCORE_FORWARDEDHEADERS_ENABLED
+            value: "true"
+          - name: CACHE_HOST
+            value: '{{ .Env.CACHE_HOSTNAME }}'
+          - name: CACHE_PORT
+            value: "10000"
+          - name: CATALOGDB_DATABASENAME
+            value: catalogdb
+          - name: CATALOGDB_HOST
+            value: '{{ .Env.POSTGRES_HOSTNAME }}'
+          - name: CATALOGDB_JDBCCONNECTIONSTRING
+            value: jdbc:postgresql://{{ .Env.POSTGRES_HOSTNAME }}/catalogdb?sslmode=require&authenticationPluginClassName=com.azure.identity.extensions.jdbc.postgresql.AzurePostgresqlAuthenticationPlugin
+          - name: CATALOGDB_PORT
+            value: "5432"
+          - name: CATALOGDB_USERNAME
+            value: '{{ parameter "postgres_username" }}'
+          - name: HTTP_PORTS
+            value: '{{ targetPortOrDefault 0 }}'
+          - name: OTEL_DOTNET_EXPERIMENTAL_OTLP_RETRY
+            value: in_memory
+          - name: PRODUCT_IMAGES_BLOBCONTAINERNAME
+            value: product-images
+          - name: PRODUCT_IMAGES_URI
+            value: '{{ .Env.STORAGE_BLOBENDPOINT }}'
+          - name: SERVICEBUS_HOST
+            value: '{{ .Env.SERVICEBUS_SERVICEBUSHOSTNAME }}'
+          - name: SERVICEBUS_URI
+            value: '{{ .Env.SERVICEBUS_SERVICEBUSENDPOINT }}'
+          - name: CATALOGDB_PASSWORD
+            secretRef: catalogdb-password
+          - name: CATALOGDB_URI
+            secretRef: catalogdb-uri
+          - name: ConnectionStrings__product-images
+            secretRef: connectionstrings--product-images
+          - name: ConnectionStrings__servicebus
+            secretRef: connectionstrings--servicebus
+          - name: Jwt__SigningKey
+            secretRef: jwt--signingkey
+          - name: CACHE_PASSWORD
+            secretRef: cache-password
+          - name: ConnectionStrings__cache
+            secretRef: connectionstrings--cache
+          - name: ConnectionStrings__catalogdb
+            secretRef: connectionstrings--catalogdb
+    scale:
+      minReplicas: 1
+tags:
+  azd-service-name: catalog
+  aspire-resource-name: catalog
