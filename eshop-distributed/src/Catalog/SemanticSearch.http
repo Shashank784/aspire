@@ -1,0 +1,38 @@
+### Semantic search (vector embeddings + vector store) — demo requests
+### Run the AppHost first and wait until the "embedding" model shows Running in the dashboard.
+### The FIRST search embeds all products (a few seconds); later searches are fast.
+
+@Catalog = https://localhost:7234
+@Bff = https://localhost:7176
+
+### 1. Keyword search (old way) — finds NOTHING, because no product name contains these words
+GET {{Catalog}}/products/search/keep me dry
+Accept: application/json
+
+### 2. Semantic search (new way) — finds Quick-Dry Towel and Outdoor Rain Jacket by meaning
+GET {{Catalog}}/products/ai/search?query=something to keep me dry&top=3
+Accept: application/json
+
+### 3. "light in the dark" → Headlamp, Solar Powered Flashlight, Camping Lantern
+GET {{Catalog}}/products/ai/search?query=I need light in the dark&top=3
+Accept: application/json
+
+### 4. "cook dinner" → Camping Stove, Camping Cookware
+GET {{Catalog}}/products/ai/search?query=cook dinner at the campsite&top=3
+Accept: application/json
+
+### 5. "place to sleep" → Camping Tent, Sleeping Bag
+GET {{Catalog}}/products/ai/search?query=a place to sleep in the forest&top=3
+Accept: application/json
+
+### 6. Something we don't sell — still returns the closest items, but with lower scores (~0.35 vs ~0.5)
+GET {{Catalog}}/products/ai/search?query=mountain bike&top=3
+Accept: application/json
+
+### 7. Same search through the BFF (the way the React page calls it)
+GET {{Bff}}/api/products/ai/search?query=carry my stuff on a long walk&top=3
+Accept: application/json
+
+### 8. Validation — empty query returns 400
+GET {{Catalog}}/products/ai/search?query=
+Accept: application/json

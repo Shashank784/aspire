@@ -24,6 +24,7 @@ export function Layout() {
             <NavLink to="/" end>
               Shop
             </NavLink>
+            <NavLink to="/smart-search">Smart search</NavLink>
             <NavLink to="/support">Ask AI</NavLink>
             {user.isAuthenticated && !isAdmin && <NavLink to="/basket">Basket</NavLink>}
             {user.isAuthenticated && !isAdmin && <NavLink to="/orders">My orders</NavLink>}

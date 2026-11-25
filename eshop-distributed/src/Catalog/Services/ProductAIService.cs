@@ -13,8 +13,28 @@ namespace Catalog.Services;
 //   3. Generate: the LLM answers using ONLY those products, so it does not make things up.
 //
 // The code only depends on IChatClient (Microsoft.Extensions.AI), not on Ollama directly.
-public class ProductAIService(IChatClient chatClient, ProductService productService, ILogger<ProductAIService> logger)
+public class ProductAIService(
+    IChatClient chatClient,
+    ProductService productService,
+    ProductVectorIndex vectorIndex,
+    ILogger<ProductAIService> logger)
 {
+    // Semantic search: find products by MEANING, not by matching words.
+    // "something to keep me dry" finds the Rain Jacket even though no word matches.
+    public async Task<SemanticSearchResponse> SearchProductsAsync(string query, int top, CancellationToken cancellationToken = default)
+    {
+        var stopwatch = Stopwatch.StartNew();
+
+        var products = (await productService.GetProductsAsync()).ToList();
+        var results = await vectorIndex.SearchAsync(products, query, top, cancellationToken);
+
+        stopwatch.Stop();
+        logger.LogInformation("Semantic search for {Query} returned {Count} results in {ElapsedMs} ms",
+            query, results.Count, stopwatch.ElapsedMilliseconds);
+
+        return new SemanticSearchResponse(query, results, stopwatch.ElapsedMilliseconds);
+    }
+
     // Keeps the prompt small enough for a small local model.
     private const int MaxProductsInPrompt = 50;
     private const int MaxHistoryTurns = 10;

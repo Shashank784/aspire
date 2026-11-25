@@ -66,6 +66,10 @@ var ollama = builder
 
 var chatModel = ollama.AddModel("chat", "llama3.2");
 
+// Embedding model for semantic search. all-minilm (~45 MB) turns text into 384 numbers (a vector);
+// texts with similar meaning get similar vectors. "embedding" is the connection name in Catalog.
+var embeddingModel = ollama.AddModel("embedding", "all-minilm");
+
 // Projects
 var identity = builder
     .AddProject<Projects.Identity>("identity")
@@ -83,6 +87,7 @@ var catalog = builder
     // No WaitFor here: the model download can take minutes on the first run, and the rest of
     // the shop should not wait for it. Only the AI endpoints need the model.
     .WithReference(chatModel)
+    .WithReference(embeddingModel)
     .WaitFor(catalogDb)
     .WaitFor(productImages)
     .WaitFor(cache)

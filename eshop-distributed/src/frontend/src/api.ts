@@ -158,6 +158,26 @@ export const supportApi = {
     request<SupportResponse>('POST', '/api/products/ai/chat', { question, history }),
 }
 
+// Semantic search (Catalog → embeddings + vector store). Score: 1 = same meaning, 0 = unrelated.
+export interface SemanticSearchResult {
+  product: Product
+  score: number
+}
+
+export interface SemanticSearchResponse {
+  query: string
+  results: SemanticSearchResult[]
+  durationMs: number
+}
+
+export const semanticSearchApi = {
+  search: (query: string, top = 5) =>
+    request<SemanticSearchResponse>(
+      'GET',
+      `/api/products/ai/search?${new URLSearchParams({ query, top: String(top) })}`,
+    ),
+}
+
 export const basketApi = {
   // Basket answers 404 when the user has no basket yet — treat that as empty.
   get: async (userName: string): Promise<Basket> => {

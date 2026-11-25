@@ -9,3 +9,8 @@ public record SupportRequest(string Question, List<ChatTurn>? History = null);
 
 // What the assistant answers. DurationMs is handy in the demo to show how long the LLM took.
 public record SupportResponse(string Answer, long DurationMs);
+
+// Semantic search: products ranked by meaning. Score is the cosine similarity (higher = closer).
+public record SemanticSearchResult(Product Product, double Score);
+
+public record SemanticSearchResponse(string Query, List<SemanticSearchResult> Results, long DurationMs);

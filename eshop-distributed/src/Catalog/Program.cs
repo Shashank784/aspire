@@ -1,4 +1,7 @@
 
+using Microsoft.Extensions.VectorData;
+using Microsoft.SemanticKernel.Connectors.InMemory;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -30,6 +33,15 @@ builder.AddJwtValidation();
 // Our code only talks to IChatClient, so Ollama can later be swapped for OpenAI / Azure OpenAI.
 builder.AddOllamaApiClient("chat").AddChatClient();
 builder.Services.AddScoped<ProductAIService>();
+
+// Semantic search: IEmbeddingGenerator backed by the Ollama "embedding" model (all-minilm).
+// The keyed client keeps it separate from the "chat" client, so each one talks to its own model.
+builder.AddKeyedOllamaApiClient("embedding").AddEmbeddingGenerator();
+
+// Vector store (Microsoft.Extensions.VectorData). In-memory for the demo; swap this one line for
+// Qdrant / pgvector / Azure AI Search in production. Singletons so the vectors are kept between requests.
+builder.Services.AddSingleton<VectorStore>(_ => new InMemoryVectorStore());
+builder.Services.AddSingleton<ProductVectorIndex>();
 
 // A local LLM on CPU can take longer than the default 10-second resilience timeout, and retrying
 // a slow answer only makes it slower. So the Ollama HttpClient gets a long timeout and no retries.
